@@ -26,15 +26,21 @@ class CocoDetectionDataset(dataset.DatasetMixin):
     def __init__(self, root_dir='./', data_dir='train2014',
                  anno_file='annotations'):
         coco = COCO(os.path.join(root_dir, anno_file))
-        anns = coco.loadAnns(coco.getAnnIds())
-
-        self.coco = coco
-        self.anns = anns
+        category_ids = coco.getCategoryIds()
+        cat_label_dic = {cat:(label+1) for label, cat in enumerate(category_ids)}
+        all_img_ids = coco.getImgIds()
+        all_annotation_ids = coco.getAnnotationIds(img_ids=all_img_ids)
+        all_annotations = coco.loadAnnotations(all_annotation_ids)
+        img_base_dir = os.path.join(root_dir, data_dir)
+        all_img_info = coco.loadImgs(all_img_ids)
+        self.imgs_path = [os.path.join(img_base_dir, img_info['file_name']) for img_info in all_img_info]
+        self.bboxes = [[ann['bbox'] for ann in anns] for anns in all_annotations]
+        self.labels = [[cat_label_dic[ann['category_id']] for ann in anns] for anns in all_annotations]
         self.coco_root = root_dir
         self.coco_data = data_dir
 
     def __len__(self):
-        return len(self.anns)
+        return len(self.imgs_path)
 
     def get_example(self, i):
         """Called by the iterator to fetch a data sample.
@@ -44,24 +50,13 @@ class CocoDetectionDataset(dataset.DatasetMixin):
 
         The returned image has the shape (channel, height, width).
         """
-        ann = self.anns[i]
-
         # Load the image
-        img_id = ann['image_id']
-        img_file_name = self.coco.loadImgs([img_id])[0]['file_name']
-        img = Image.open(
-            os.path.join(self.coco_root, self.coco_data, img_file_name))
+        img = Image.open(self.imgs_path[i])
         if img.mode == 'RGB':
             img = np.asarray(img, np.float32).transpose(2, 0, 1)
-        elif img.mode == 'L':
-            img = np.asarray(img, np.float32)
-            img = np.broadcast_to(img, (3,) + img.shape)
         else:
             raise ValueError('Invalid image mode {}'.format(img.mode))
+        bboxes = self.bboxes[i]
+        labels = self.labels[i]
 
-        # Load the caption, i.e. sequence of tokens
-        tokens = [self.vocab.get(w, _unk) for w in
-                  ['<bos>'] + split(ann['caption']) + ['<eos>']]
-        tokens = np.array(tokens, np.int32)
-
-        return img, tokens
+        return img, bboxes, labels

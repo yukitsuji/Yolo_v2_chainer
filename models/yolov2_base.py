@@ -16,9 +16,6 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable
-from models.transform import transform
-from models.pose_net import PoseNet
-from models.disp_net import DispNet
 
 def create_timer():
     start = chainer.cuda.Event()

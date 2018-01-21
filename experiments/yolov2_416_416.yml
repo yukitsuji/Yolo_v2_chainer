@@ -1,6 +1,6 @@
 end_trigger: [200000, "iteration"] # 3200 / 16 = 200 * 150 = 30000
 results: results
-gpus: [1]
+gpus: [0]
 mode: Train
 seed: 1
 
@@ -26,10 +26,10 @@ dataset:
   valid:
     module: datasets.coco.coco_detection_dataset
     name: CocoDetectionDataset
-  args:
-    root_dir: ../dataset/COCO
-    data_dir: val2014
-    anno_file: annotations/instances_val2014.json
+    args:
+      root_dir: ../dataset/COCO
+      data_dir: val2014
+      anno_file: annotations/instances_val2014.json
 
 updater:
   name: StandardUpdater
