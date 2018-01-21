@@ -21,8 +21,8 @@ from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
     lambda loader, node: OrderedDict(loader.construct_pairs(node)))
 
-def train_sfm_learner():
-    """Training VoxelNet."""
+def train_yolov2():
+    """Training yolov2."""
     config = parse_args()
     model = get_model(config["model"])
     devices = parse_devices(config['gpus'], config['updater']['name'])
@@ -41,7 +41,7 @@ def train_sfm_learner():
                                  model)
 
 def main():
-    train_sfm_learner()
+    train_yolov2()
 
 if __name__ == '__main__':
     main()
