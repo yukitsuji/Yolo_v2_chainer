@@ -24,13 +24,12 @@ yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
 def train_yolov2():
     """Training yolov2."""
     config = parse_args()
-    model = get_model(config["model"])
     devices = parse_devices(config['gpus'], config['updater']['name'])
     train_data, test_data = load_dataset(config["dataset"])
     train_iter, test_iter = create_iterator(train_data, test_data,
                                             config['iterator'], devices,
                                             config['updater']['name'])
-
+    model = get_model(config["model"])
     optimizer = create_optimizer(config['optimizer'], model)
     updater = create_updater(train_iter, optimizer, config['updater'], devices)
     trainer = training.Trainer(updater, config['end_trigger'], out=config['results'])

@@ -9,67 +9,59 @@ from scipy.misc import imread
 
 from chainer import dataset
 
-def load_as_float_norm(path):
-    img = imread(path).astype(np.float32).transpose(2, 1, 0)
-    return (img / 255.) * 2 - 1
+from collections import defaultdict
+import os
+from datasets.coco.utils import *
 
-class KittiRawDataset(dataset.DatasetMixin):
 
-    """Dataset class for a task on `Kitti Raw Dataset`_.
+class CocoDetectionDataset(dataset.DatasetMixin):
+
+    """Dataset class for a task on `Coco Detection Dataset`_.
 
     Args:
         data_dir (string): Path to the dataset directory. The directory should
             contain at least three directories, :obj:`training`, `testing`
             and `ImageSets`.
-        split ({'train', 'val'}): Select from dataset splits used in
-            KiTTi Raw Dataset.
     """
-    def __init__(self, data_dir=None, seq_len=3, split='train'):
-        with open(os.path.join(data_dir, "{}.txt".format(split)), 'r') as f:
-            dir_indexes = f.read().split('\n')
+    def __init__(self, root_dir='./', data_dir='train2014',
+                 anno_file='annotations'):
+        coco = COCO(os.path.join(root_dir, anno_file))
+        anns = coco.loadAnns(coco.getAnnIds())
 
-        if not dir_indexes[-1]:
-            dir_indexes = dir_indexes[:-1]
-
-        self.dir_pathes = [os.path.join(data_dir, index) for index in dir_indexes]
-        self.seq_len = seq_len
-        self.samples = self.crawl_folders()
-
-    def crawl_folders(self):
-        sequence_set = []
-        demi_len = (self.seq_len - 1)//2
-        for dir_path in self.dir_pathes:
-            calib_path = os.path.join(dir_path, 'cam.txt')
-            intrinsics = np.genfromtxt(calib_path, delimiter=',')
-            intrinsics = intrinsics.astype(np.float32).reshape((3, 3))
-            imgs = glob.glob(os.path.join(dir_path, '*.jpg'))
-            imgs.sort()
-            if len(imgs) < self.seq_len:
-                continue
-            for i in range(demi_len, len(imgs)-demi_len):
-                sample = {'intrinsics': intrinsics, 'tgt': imgs[i],
-                          'ref_imgs': []}
-                for j in range(-demi_len, demi_len + 1):
-                    if j != 0:
-                        sample['ref_imgs'].append(imgs[i+j])
-                sequence_set.append(sample)
-        random.shuffle(sequence_set)
-        return sequence_set
+        self.coco = coco
+        self.anns = anns
+        self.coco_root = root_dir
+        self.coco_data = data_dir
 
     def __len__(self):
-        return len(self.samples)
-
-    def save_img(self, tgt_img, ref_imgs):
-        import cv2
-        print('tgt path', sample['tgt'])
-        print('src pathes', sample['ref_imgs'])
-        cv2.imwrite('tgt.png', tgt_img.transpose(2, 1, 0).astype('i'))
-        cv2.imwrite('src1.png', ref_imgs[0].transpose(2, 1, 0).astype('i'))
-        cv2.imwrite('src2.png', ref_imgs[1].transpose(2, 1, 0).astype('i'))
+        return len(self.anns)
 
     def get_example(self, i):
-        sample = self.samples[i]
-        tgt_img = load_as_float_norm(sample['tgt'])
-        ref_imgs = [load_as_float_norm(ref_img) for ref_img in sample['ref_imgs']]
-        intrinsics = np.copy(sample['intrinsics'])
-        return tgt_img, ref_imgs, intrinsics, np.linalg.inv(intrinsics)
+        """Called by the iterator to fetch a data sample.
+
+        A data sample from MSCOCO consists of an image and its corresponding
+        caption.
+
+        The returned image has the shape (channel, height, width).
+        """
+        ann = self.anns[i]
+
+        # Load the image
+        img_id = ann['image_id']
+        img_file_name = self.coco.loadImgs([img_id])[0]['file_name']
+        img = Image.open(
+            os.path.join(self.coco_root, self.coco_data, img_file_name))
+        if img.mode == 'RGB':
+            img = np.asarray(img, np.float32).transpose(2, 0, 1)
+        elif img.mode == 'L':
+            img = np.asarray(img, np.float32)
+            img = np.broadcast_to(img, (3,) + img.shape)
+        else:
+            raise ValueError('Invalid image mode {}'.format(img.mode))
+
+        # Load the caption, i.e. sequence of tokens
+        tokens = [self.vocab.get(w, _unk) for w in
+                  ['<bos>'] + split(ann['caption']) + ['<eos>']]
+        tokens = np.array(tokens, np.int32)
+
+        return img, tokens

@@ -16,23 +16,20 @@ model:
 
 dataset:
   train:
-    module: datasets.kitti.kitti_raw_transformed
-    name: KittiRawTransformed
+    module: datasets.coco.coco_detection_dataset
+    name: CocoDetectionDataset
     args:
-      data_dir: ../dataset/KITTI_formatted
-      # data_dir: /home/user/.chainer/dataset/pfnet/chainer/raw
-      split: train
-      seq_len: 3
-      n_scale: 4
+      root_dir: ../dataset/COCO
+      data_dir: train2014
+      anno_file: annotations/instances_train2014.json
 
   valid:
-    module: datasets.kitti.kitti_raw_dataset
-    name: KittiRawDataset
-    args:
-      data_dir: ../dataset/KITTI_formatted
-      # data_dir: /home/user/.chainer/dataset/pfnet/chainer/raw
-      split: val
-      seq_len: 3
+    module: datasets.coco.coco_detection_dataset
+    name: CocoDetectionDataset
+  args:
+    root_dir: ../dataset/COCO
+    data_dir: val2014
+    anno_file: annotations/instances_val2014.json
 
 updater:
   name: StandardUpdater
