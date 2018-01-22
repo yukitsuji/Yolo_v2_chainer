@@ -3,6 +3,7 @@
 
 import glob
 import numpy as np
+from PIL import Image
 import os
 import random
 from scipy.misc import imread
@@ -36,11 +37,6 @@ class CocoDetectionDataset(dataset.DatasetMixin):
         self.imgs_path = [os.path.join(img_base_dir, img_info['file_name']) for img_info in all_img_info]
         self.bboxes = [[ann['bbox'] for ann in anns] for anns in all_annotations]
         self.labels = [[cat_label_dic[ann['category_id']] for ann in anns] for anns in all_annotations]
-        self.coco_root = root_dir
-        self.coco_data = data_dir
-
-        # Convert all datasets to batch
-        print(anns[i])
 
     def __len__(self):
         return len(self.imgs_path)
@@ -59,7 +55,7 @@ class CocoDetectionDataset(dataset.DatasetMixin):
             img = np.asarray(img, np.float32).transpose(2, 0, 1)
         else:
             raise ValueError('Invalid image mode {}'.format(img.mode))
-        bboxes = self.bboxes[i]
-        labels = self.labels[i]
-
+        bboxes = np.array(self.bboxes[i], dtype='f')
+        labels = np.array(self.labels[i], dtype='i')
+        
         return img, bboxes, labels

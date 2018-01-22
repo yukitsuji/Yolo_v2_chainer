@@ -5,14 +5,14 @@ mode: Train
 seed: 1
 
 model:
-  module: models.base_model
-  name: SFMLearner
+  module: models.yolov2_base
+  name: YOLOv2
   pretrained_model:
     path: # 0000_model.npz
     download: # https://0000_model.npz
   architecture:
-    smooth_reg: 0.5
-    exp_reg: 0
+    n_classes: 80
+    n_boxes: 5
 
 dataset:
   train:

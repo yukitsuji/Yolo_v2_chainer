@@ -33,13 +33,13 @@ def print_timer(start, stop, sentence="Time"):
     return elapsed_time
 
 
-class YOLOv2(Chain):
+class YOLOv2(chainer.Chain):
     """Implementation of YOLOv2(416*416).
     """
-    def __init__(self, n_classes=80, n_boxes=5, **kwargs):
+    def __init__(self, config, pretrained_model=None):
         super(YOLOv2, self).__init__()
-        self.n_boxes = n_boxes
-        self.n_classes = n_classes
+        self.n_boxes = config['n_boxes']
+        self.n_classes = config['n_classes']
 
         with self.init_scope():
             conv1  = L.Convolution2D(3, 32, ksize=3, stride=1, pad=1),
@@ -85,7 +85,7 @@ class YOLOv2(Chain):
             bn20   = L.BatchNormalization(1024),
             conv21 = L.Convolution2D(3072, 1024, ksize=3, stride=1, pad=1),
             bn21   = L.BatchNormalization(1024),
-            out_ch = n_boxes * (5 + n_classes)
+            out_ch = self.n_boxes * (5 + self.n_classes)
             conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
         if pretrained_model['download']:
