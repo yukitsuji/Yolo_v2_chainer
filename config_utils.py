@@ -26,7 +26,7 @@ from chainer.training import extensions
 
 import chainercv
 
-from models import base_model
+from models import yolov2_base
 # from extension_util import lr_utils
 
 from collections import OrderedDict
