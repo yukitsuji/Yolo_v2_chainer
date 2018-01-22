@@ -38,7 +38,7 @@ iterator:
   name: SerialIterator #MultiprocessIterator
   train_batchsize: 4
   test_batchsize: 4
-  #args:
+  # args:
   #  n_processes: 4
   #  n_prefetch: 1
   #  shared_mem: 60000000
@@ -49,6 +49,8 @@ optimizer:
     alpha: 0.0002
     beta1: 0.9
     beta2: 0.999
+  hook:
+    WeightDecay: 0.0005
 
 extension:
   #Evaluator:

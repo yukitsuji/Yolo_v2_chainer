@@ -33,6 +33,9 @@ class CocoDetectionDataset(dataset.DatasetMixin):
         self.coco_root = root_dir
         self.coco_data = data_dir
 
+        # Convert all datasets to batch
+        print(anns[i])
+
     def __len__(self):
         return len(self.anns)
 

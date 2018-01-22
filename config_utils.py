@@ -114,7 +114,6 @@ def create_extension(trainer, test_iter, model, config, devices=None):
 def create_updater(train_iter, optimizer, config, devices):
     if "MultiprocessParallelUpdater" in config['name']:
         Updater = chainer.training.updaters.MultiprocessParallelUpdater
-        # Updater = MyMultiprocessParallelUpdater
         return Updater(train_iter, optimizer, devices=devices)
 
     Updater = getattr(chainer.training, config['name'])

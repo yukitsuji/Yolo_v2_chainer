@@ -36,17 +36,60 @@ def print_timer(start, stop, sentence="Time"):
     return elapsed_time
 
 
-class SFMLearner(chainer.Chain):
+class YOLOv2(Chain):
+    """Implementation of YOLOv2(416*416).
+    """
+    def __init__(self, n_classes=80, n_boxes=5, **kwargs):
+        super(YOLOv2, self).__init__()
+        self.n_boxes = n_boxes
+        self.n_classes = n_classes
 
-    """Sfm Learner original Implementation"""
+        with self.init_scope():
+            conv1  = L.Convolution2D(3, 32, ksize=3, stride=1, pad=1),
+            bn1    = L.BatchNormalization(32),
+            conv2  = L.Convolution2D(32, 64, ksize=3, stride=1, pad=1),
+            bn2    = L.BatchNormalization(64),
+            conv3  = L.Convolution2D(64, 128, ksize=3, stride=1, pad=1),
+            bn3    = L.BatchNormalization(128),
+            conv4  = L.Convolution2D(128, 64, ksize=1, stride=1, pad=0),
+            bn4    = L.BatchNormalization(64),
+            conv5  = L.Convolution2D(64, 128, ksize=3, stride=1, pad=1),
+            bn5    = L.BatchNormalization(128),
+            conv6  = L.Convolution2D(128, 256, ksize=3, stride=1, pad=1),
+            bn6    = L.BatchNormalization(256),
+            conv7  = L.Convolution2D(256, 128, ksize=1, stride=1, pad=0),
+            bn7    = L.BatchNormalization(128),
+            conv8  = L.Convolution2D(128, 256, ksize=3, stride=1, pad=1),
+            bn8    = L.BatchNormalization(256),
+            conv9  = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
+            bn9    = L.BatchNormalization(512),
+            conv10 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0),
+            bn10   = L.BatchNormalization(256),
+            conv11 = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
+            bn11   = L.BatchNormalization(512),
+            conv12 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0),
+            bn12   = L.BatchNormalization(256),
+            conv13 = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
+            bn13   = L.BatchNormalization(512),
+            conv14 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
+            bn14   = L.BatchNormalization(1024),
+            conv15 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0),
+            bn15   = L.BatchNormalization(512),
+            conv16 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
+            bn16   = L.BatchNormalization(1024),
+            conv17 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0),
+            bn17   = L.BatchNormalization(512),
+            conv18 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
+            bn18   = L.BatchNormalization(1024),
 
-    def __init__(self, config, pretrained_model=None):
-        super(SFMLearner, self).__init__(
-			pose_net = PoseNet(),
-            disp_net = DispNet())
-
-        self.smooth_reg = config['smooth_reg']
-        self.exp_reg = config['exp_reg']
+            conv19 = L.Convolution2D(1024, 1024, ksize=3, stride=1, pad=1),
+            bn19   = L.BatchNormalization(1024),
+            conv20 = L.Convolution2D(1024, 1024, ksize=3, stride=1, pad=1),
+            bn20   = L.BatchNormalization(1024),
+            conv21 = L.Convolution2D(3072, 1024, ksize=3, stride=1, pad=1),
+            bn21   = L.BatchNormalization(1024),
+            out_ch = n_boxes * (5 + n_classes)
+            conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
         if pretrained_model['download']:
             if not os.path.exists(pretrained_model['download'].split("/")[-1]):
@@ -55,97 +98,46 @@ class SFMLearner(chainer.Chain):
         if pretrained_model['path']:
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
-    def __call__(self, tgt_img, src_imgs, intrinsics, inv_intrinsics):
-        """
-           Args:
-               tgt_img: target image. Shape is (Batch, 3, H, W)
-               src_imgs: source images. Shape is (Batch, ?, 3, H, W)
-               intrinsics: Shape is (Batch, ?, 3, 3)
-           Return:
-               loss (Variable).
-        """
-        batchsize, n_sources, _, H, W = src_imgs.shape # tgt_img.shape
-        stacked_src_imgs = self.xp.reshape(src_imgs, (batchsize, -1, H, W))
-        pred_disps = self.disp_net(tgt_img)
-        pred_depthes = [1 / d for d in pred_disps]
-        do_exp = self.exp_reg is not None and self.exp_reg > 0
-        pred_poses, pred_maskes = self.pose_net(tgt_img, stacked_src_imgs, do_exp)
-        smooth_loss, exp_loss, pixel_loss = 0, 0, 0
-        n_scales = len(pred_depthes)
-        for ns in range(n_scales):
-            curr_img_size = (H // (2 ** ns), W // (2 ** ns))
-            curr_tgt_img = F.resize_images(tgt_img, curr_img_size)
-            curr_src_imgs = F.resize_images(stacked_src_imgs, curr_img_size)
+    def model(self, x):
+        h = F.leaky_relu(self.bn1(self.conv1(x)), slope=0.1)
+        h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
+        h = F.leaky_relu(self.bn2(self.conv2(h)), slope=0.1)
+        h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
+        h = F.leaky_relu(self.bn3(self.conv3(h)), slope=0.1)
+        h = F.leaky_relu(self.bn4(self.conv4(h)), slope=0.1)
+        h = F.leaky_relu(self.bn5(self.conv5(h)), slope=0.1)
+        h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
+        h = F.leaky_relu(self.bn6(self.conv6(h)), slope=0.1)
+        h = F.leaky_relu(self.bn7(self.conv7(h)), slope=0.1)
+        h = F.leaky_relu(self.bn8(self.conv8(h)), slope=0.1)
+        h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
+        h = F.leaky_relu(self.bn9(self.conv9(h)), slope=0.1)
+        h = F.leaky_relu(self.bn10(self.conv10(h)), slope=0.1)
+        h = F.leaky_relu(self.bn11(self.conv11(h)), slope=0.1)
+        h = F.leaky_relu(self.bn12(self.conv12(h)), slope=0.1)
+        h = F.leaky_relu(self.bn13(self.conv13(h)), slope=0.1)
+        high_resolution_feature = reorg(h)
+        h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
+        h = F.leaky_relu(self.bn14(self.conv14(h)), slope=0.1)
+        h = F.leaky_relu(self.bn15(self.conv15(h)), slope=0.1)
+        h = F.leaky_relu(self.bn16(self.conv16(h)), slope=0.1)
+        h = F.leaky_relu(self.bn17(self.conv17(h)), slope=0.1)
+        h = F.leaky_relu(self.bn18(self.conv18(h)), slope=0.1)
 
-            if self.smooth_reg:
-                smooth_loss += self.smooth_reg / (2 ** ns) * \
-                                   self.compute_smooth_loss(pred_disps[ns])
+        h = F.leaky_relu(self.bn19(self.conv19(h)), slope=0.1)
+        h = F.leaky_relu(self.bn20(self.conv20(h)), slope=0.1)
+        h = F.concat((high_resolution_feature, h), axis=1)
+        h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
+        return self.conv22(h)
 
-            for i in range(n_sources):
-                # Inverse warp the source image to the target image frame
-                curr_proj_img = transform(
-                    curr_src_imgs[:, i*3:(i+1)*3],
-                    pred_depthes[ns],
-                    pred_poses[i],
-                    intrinsics[:, ns])
-
-                curr_proj_error = F.absolute(curr_proj_img - curr_tgt_img)
-                # Cross-entropy loss as regularization for the
-                # explainability prediction
-                if self.exp_reg:
-                    pred_exp_logits = pred_maskes[ns][:, i*2:(i+1)*2, :, :]
-                    exp_loss += self.exp_reg * \
-                                    self.compute_exp_reg_loss(pred_exp_logits)
-                    pred_exp = F.softmax(pred_exp_logits)[:, 1:, :, :]
-                    pred_exp = F.broadcast_to(pred_exp, (batchsize, 3, *curr_img_size))
-                    pixel_loss += F.mean(curr_proj_error * pred_exp)
-                else:
-                    pixel_loss += F.mean(curr_proj_error)
-        total_loss = pixel_loss + smooth_loss + exp_loss
-        chainer.report({'total_loss': total_loss}, self)
-        chainer.report({'pixel_loss': pixel_loss}, self)
-        chainer.report({'smooth_loss': smooth_loss}, self)
-        chainer.report({'exp_loss': exp_loss}, self)
+    def __call__(self, imgs, gt_boxes, gt_labels):
+        output = self.model(imgs)
         return total_loss
 
-    def compute_exp_reg_loss(self, pred):
-        """Compute expalanation loss.
-
-           Args:
-               pred: Shape is (Batch, 2, H, W)
-        """
-        p_shape = pred.shape
-        label = self.xp.ones((p_shape[0] * p_shape[2] * p_shape[3],), dtype='i')
-        l = F.softmax_cross_entropy(
-            F.reshape(pred, (-1, 2)), label)
-        return F.mean(l)
-
-    def compute_smooth_loss(self, pred_disp):
-        """Compute smoothness loss for the predicted dpeth maps.
-           L1 norm of the second-order gradients.
-
-           Args:
-               pred_disp: Shape is (Batch, 1, H, W)
-        """
-        def gradient(pred):
-            D_dy = pred[:, :, 1:, :] - pred[:, :, :-1, :]
-            D_dx = pred[:, :, :, 1:] - pred[:, :, :, :-1]
-            return D_dx, D_dy
-
-        dx, dy = gradient(pred_disp)
-        dx2, dxdy = gradient(dx)
-        dydx, dy2 = gradient(dy)
-        return F.mean(F.absolute(dx2)) + F.mean(F.absolute(dxdy)) \
-               + F.mean(F.absolute(dydx)) + F.mean(F.absolute(dy2))
-
-    def inference(self, tgt_img, src_imgs, intrinsics, inv_intrinsics):
+    def inference(self, imgs):
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
             start, stop = create_timer()
-            batchsize, n_sources, _, H, W = src_imgs.shape # tgt_img.shape
-            stacked_src_imgs = self.xp.reshape(src_imgs, (batchsize, -1, H, W))
-            pred_depth = 1 / self.disp_net(tgt_img)[0]
-            pred_pose, pred_maskes = self.pose_net(tgt_img, stacked_src_imgs)
-            pred_mask = pred_maskes[0]
+            output = self.model(imgs)
             print_timer(start, stop, sentence="Inference Time")
-            return pred_depth, pred_pose, pred_maskes
+            return None
