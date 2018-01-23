@@ -42,51 +42,66 @@ class YOLOv2(chainer.Chain):
         self.n_classes = config['n_classes']
 
         with self.init_scope():
-            conv1  = L.Convolution2D(3, 32, ksize=3, stride=1, pad=1),
-            bn1    = L.BatchNormalization(32),
-            conv2  = L.Convolution2D(32, 64, ksize=3, stride=1, pad=1),
-            bn2    = L.BatchNormalization(64),
-            conv3  = L.Convolution2D(64, 128, ksize=3, stride=1, pad=1),
-            bn3    = L.BatchNormalization(128),
-            conv4  = L.Convolution2D(128, 64, ksize=1, stride=1, pad=0),
-            bn4    = L.BatchNormalization(64),
-            conv5  = L.Convolution2D(64, 128, ksize=3, stride=1, pad=1),
-            bn5    = L.BatchNormalization(128),
-            conv6  = L.Convolution2D(128, 256, ksize=3, stride=1, pad=1),
-            bn6    = L.BatchNormalization(256),
-            conv7  = L.Convolution2D(256, 128, ksize=1, stride=1, pad=0),
-            bn7    = L.BatchNormalization(128),
-            conv8  = L.Convolution2D(128, 256, ksize=3, stride=1, pad=1),
-            bn8    = L.BatchNormalization(256),
-            conv9  = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
-            bn9    = L.BatchNormalization(512),
-            conv10 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0),
-            bn10   = L.BatchNormalization(256),
-            conv11 = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
-            bn11   = L.BatchNormalization(512),
-            conv12 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0),
-            bn12   = L.BatchNormalization(256),
-            conv13 = L.Convolution2D(256, 512, ksize=3, stride=1, pad=1),
-            bn13   = L.BatchNormalization(512),
-            conv14 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
-            bn14   = L.BatchNormalization(1024),
-            conv15 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0),
-            bn15   = L.BatchNormalization(512),
-            conv16 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
-            bn16   = L.BatchNormalization(1024),
-            conv17 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0),
-            bn17   = L.BatchNormalization(512),
-            conv18 = L.Convolution2D(512, 1024, ksize=3, stride=1, pad=1),
-            bn18   = L.BatchNormalization(1024),
+            self.conv1  = L.Convolution2D(3, 32, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn1    = L.BatchNormalization(32)
+            self.conv2  = L.Convolution2D(32, 64, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn2    = L.BatchNormalization(64)
+            self.conv3  = L.Convolution2D(64, 128, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn3    = L.BatchNormalization(128)
+            self.conv4  = L.Convolution2D(128, 64, ksize=1, stride=1, pad=0)
+            self.bn4    = L.BatchNormalization(64)
+            self.conv5  = L.Convolution2D(64, 128, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn5    = L.BatchNormalization(128)
+            self.conv6  = L.Convolution2D(128, 256, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn6    = L.BatchNormalization(256)
+            self.conv7  = L.Convolution2D(256, 128, ksize=1, stride=1, pad=0)
+            self.bn7    = L.BatchNormalization(128)
+            self.conv8  = L.Convolution2D(128, 256, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn8    = L.BatchNormalization(256)
+            self.conv9  = L.Convolution2D(256, 512, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn9    = L.BatchNormalization(512)
+            self.conv10 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0)
+            self.bn10   = L.BatchNormalization(256)
+            self.conv11 = L.Convolution2D(256, 512, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn11   = L.BatchNormalization(512)
+            self.conv12 = L.Convolution2D(512, 256, ksize=1, stride=1, pad=0)
+            self.bn12   = L.BatchNormalization(256)
+            self.conv13 = L.Convolution2D(256, 512, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn13   = L.BatchNormalization(512)
+            self.conv14 = L.Convolution2D(512, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn14   = L.BatchNormalization(1024)
+            self.conv15 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0)
+            self.bn15   = L.BatchNormalization(512)
+            self.conv16 = L.Convolution2D(512, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn16   = L.BatchNormalization(1024)
+            self.conv17 = L.Convolution2D(1024, 512, ksize=1, stride=1, pad=0)
+            self.bn17   = L.BatchNormalization(512)
+            self.conv18 = L.Convolution2D(512, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn18   = L.BatchNormalization(1024)
 
-            conv19 = L.Convolution2D(1024, 1024, ksize=3, stride=1, pad=1),
-            bn19   = L.BatchNormalization(1024),
-            conv20 = L.Convolution2D(1024, 1024, ksize=3, stride=1, pad=1),
-            bn20   = L.BatchNormalization(1024),
-            conv21 = L.Convolution2D(3072, 1024, ksize=3, stride=1, pad=1),
-            bn21   = L.BatchNormalization(1024),
+            self.conv19 = L.Convolution2D(1024, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn19   = L.BatchNormalization(1024)
+            self.conv20 = L.Convolution2D(1024, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn20   = L.BatchNormalization(1024)
+            self.conv21 = L.Convolution2D(3072, 1024, ksize=3,
+                                          stride=1, pad=1, nobias=True)
+            self.bn21   = L.BatchNormalization(1024)
             out_ch = self.n_boxes * (5 + self.n_classes)
-            conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
+            self.conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
         if pretrained_model['download']:
             if not os.path.exists(pretrained_model['download'].split("/")[-1]):

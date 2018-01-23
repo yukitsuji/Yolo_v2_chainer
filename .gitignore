@@ -11,3 +11,5 @@ build
 *_img
 *.caffemodel
 *.npz*
+*.weights
+*.cfg
