@@ -36,15 +36,17 @@ def demo_yolov2():
 
     dataset_config = config['dataset']['test']['args']
     index = 0
-    for batch in test_iter:
-        input_img = batch[0][0].transpose(1, 2, 0)
-        batch = chainer.dataset.concat_examples(batch, devices['main'])
-        pred_depth, pred_pose, pred_mask = model.inference(*batch)
-        depth = chainer.cuda.to_cpu(pred_depth.data[0, 0])
-        depth = normalize_depth_for_display(depth)
-        cv2.imwrite("input_{}.png".format(index), (input_img + 1) / 2 * 255)
-        cv2.imwrite("output{}.png".format(index), depth * 255 )
-        index += 1
+    # for batch in test_iter:
+    #     input_img = batch[0][0].transpose(1, 2, 0)
+    #     batch = chainer.dataset.concat_examples(batch, devices['main'])
+    # pred_depth, pred_pose, pred_mask = model.inference(*batch)
+    imgs = chainer.cuda.to_gpu(np.zeros((1, 3, 416, 416), dtype='f'), device=devices['main'])
+    model.inference(imgs)
+    # depth = chainer.cuda.to_cpu(pred_depth.data[0, 0])
+    # depth = normalize_depth_for_display(depth)
+    # cv2.imwrite("input_{}.png".format(index), (input_img + 1) / 2 * 255)
+    # cv2.imwrite("output{}.png".format(index), depth * 255 )
+    index += 1
 
 def main():
     demo_yolov2()

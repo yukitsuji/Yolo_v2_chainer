@@ -49,6 +49,9 @@ class YOLOv2_base(chainer.Chain):
         self.coord_scale = parse_dic(config, "coord_scale")
         self.thresh = parse_dic(config, "thresh")
 
+        if self.anchors:
+            self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
+
         with self.init_scope():
             self.conv1  = L.Convolution2D(3, 32, ksize=3,
                                           stride=1, pad=1, nobias=True)
@@ -150,14 +153,37 @@ class YOLOv2_base(chainer.Chain):
         h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
         return self.conv22(h)
 
-    def __call__(self, imgs, gt_boxes, gt_labels):
+    def __call__(self, imgs, gt_boxes, gt_labels): # TODO
         output = self.model(imgs)
         return total_loss
 
-    def inference(self, imgs):
+    def inference(self, imgs): # TODO: Working
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
             start, stop = create_timer()
-            output = self.model(imgs)
+            output = self.model(imgs).data
+            N, input_channel, input_h, input_w = input_x.shape
+            N, _, out_h, out_w = output.shape
+            shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
+            x, y, w, h, conf, prob = self.xp.split(self.xp.reshape(output, shape), (1, 2, 3, 4, 5,), axis=2)
+            x = F.sigmoid(x).data # shape is (N, 1, out_h, out_w)
+            y = F.sigmoid(y).data # shape is (N, 1, out_h, out_w)
+            conf = F.sigmoid(conf).data # confのactivation
+            prob = self.xp.transpose(prob, (0, 2, 1, 3, 4))
+            prob = F.softmax(prob).data # probablitiyのacitivation
+            prob = self.xp.transpose(prob, (0, 2, 1, 3, 4))
+
+            # x, y, w, hを絶対座標へ変換
+            x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f'), x.shape)
+            y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f'), y.shape)
+            if self.anchors.ndim != 4:
+                self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
+            w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], w.shape)
+            h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :] h.shape)
+            box_x = (x + x_shift) / out_w
+            box_y = (y + y_shift) / out_h
+            box_w = F.exp(w) * w_anchor / out_w
+            box_h = F.exp(h) * h_anchor / out_h
+
             print_timer(start, stop, sentence="Inference Time")
-            return None
+            return box_x, box_y, box_w, box_h, conf, prob
