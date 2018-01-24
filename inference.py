@@ -29,19 +29,19 @@ def demo_yolov2():
     config, img_path = parse_args()
     model = get_model(config["model"])
     devices = parse_devices(config['gpus'], config['updater']['name'])
-    test_data = load_dataset_test(config["dataset"])
-    test_iter = create_iterator_test(test_data,
-                                     config['iterator'])
+    #test_data = load_dataset_test(config["dataset"])
+    #test_iter = create_iterator_test(test_data,
+    #                                 config['iterator'])
     model.to_gpu(devices['main'])
 
-    dataset_config = config['dataset']['test']['args']
     index = 0
     # for batch in test_iter:
     #     input_img = batch[0][0].transpose(1, 2, 0)
     #     batch = chainer.dataset.concat_examples(batch, devices['main'])
     # pred_depth, pred_pose, pred_mask = model.inference(*batch)
-    imgs = chainer.cuda.to_gpu(np.zeros((1, 3, 416, 416), dtype='f'), device=devices['main'])
-    model.inference(imgs)
+    for i in range(10):
+        imgs = chainer.cuda.to_gpu(np.zeros((1, 3, 320, 320), dtype='f'), device=devices['main']) + i
+        model.inference(imgs)
     # depth = chainer.cuda.to_cpu(pred_depth.data[0, 0])
     # depth = normalize_depth_for_display(depth)
     # cv2.imwrite("input_{}.png".format(index), (input_img + 1) / 2 * 255)

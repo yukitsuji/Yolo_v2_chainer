@@ -13,6 +13,13 @@ model:
   architecture:
     n_classes: 80
     n_boxes: 5
+    anchors: [0.738768,0.874946,  2.42204,2.65704,
+              4.30971,7.04493,  10.246,4.59428,  12.6868,11.8741]
+    object_scale: 5
+    noobject_scale: 1
+    class_scale: 1
+    coord_scale: 1
+    thresh :  .6
 
 dataset:
   test:
