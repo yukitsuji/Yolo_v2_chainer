@@ -33,11 +33,11 @@ def print_timer(start, stop, sentence="Time"):
     return elapsed_time
 
 
-class YOLOv2(chainer.Chain):
+class YOLOv2_base(chainer.Chain):
     """Implementation of YOLOv2(416*416).
     """
     def __init__(self, config, pretrained_model=None):
-        super(YOLOv2, self).__init__()
+        super(YOLOv2_base, self).__init__()
         self.n_boxes = config['n_boxes']
         self.n_classes = config['n_classes']
 

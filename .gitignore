@@ -13,3 +13,4 @@ build
 *.npz*
 *.weights
 *.cfg
+weight/
