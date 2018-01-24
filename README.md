@@ -42,6 +42,7 @@ python inference.py --img /path/to/img.png --width 1024 --height 512
   その領域の誤差を0とする。もし閾値を超えていなければ、noobject_scale * (0 - l.output[index])
   また、少ないbatch数(12800まで)のときには、すべての領域に関して、x, y, w, hの誤差を計算する。scaleは0.01
 - GroundTruthの(x, y, w, h)の値は、(x / img_w, y / img_h, exp(w * (anchor_w / img_w)))
+- Anchorの値の意味：
 
 
 # TODO

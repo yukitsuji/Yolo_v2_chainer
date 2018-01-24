@@ -16,6 +16,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable
+from models.yolov2_base import YOLOv2_base
 
 def create_timer():
     start = chainer.cuda.Event()
@@ -32,33 +33,41 @@ def print_timer(start, stop, sentence="Time"):
     print(sentence, elapsed_time)
     return elapsed_time
 
+def parse_dic(dic, key):
+    return None if dic is None or not key in dic else dic[key]
 
-class YOLOv2_update_base(chainer.Chain):
+
+class YOLOv2_update_base(YOLOv2_base):
     """Implementation of update version of YOLOv2(416*416).
     """
     def __init__(self, config, pretrained_model=None):
         super(YOLOv2_update_base, self).__init__(config)
         self.n_boxes = config['n_boxes']
         self.n_classes = config['n_classes']
+        self.anchors = parse_dic(config, "anchors")
+        self.object_scale = parse_dic(config, "object_scale")
+        self.nonobject_scale = parse_dic(config, "nonobject_scale")
+        self.coord_scale = parse_dic(config, "coord_scale")
+        self.thresh = parse_dic(config, "thresh")
 
         with self.init_scope():
-            self.conv21 = L.Convolution2D(2048, 64, ksize=1,
+            delattr(self, 'conv21'); delattr(self, 'bn21')
+            self.conv21 = L.Convolution2D(512, 64, ksize=1,
                                           stride=1, pad=0, nobias=True)
-            self.bn21   = L.BatchNormalization(1024)
-            # 1024 + 64 = 1090
-            self.conv22 = L.Convolution2D(1090, 1024, ksize=3,
+            self.bn21   = L.BatchNormalization(64)
+            # 1024 + 256 = 1280
+            delattr(self, 'conv22')
+            self.conv22 = L.Convolution2D(1280, 1024, ksize=3,
                                           stride=1, pad=1, nobias=True)
             self.bn22   = L.BatchNormalization(1024)
-            self.conv23 = L.Convolution2D(3072, 1024, ksize=3,
-                                          stride=1, pad=1, nobias=True)
             out_ch = self.n_boxes * (5 + self.n_classes)
-            self.conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
+            self.conv23 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
-        if pretrained_model['download']:
+        if parse_dic(pretrained_model, 'download'):
             if not os.path.exists(pretrained_model['download'].split("/")[-1]):
                 subprocess.call(['wget', pretrained_model['download']])
 
-        if pretrained_model['path']:
+        if parse_dic(pretrained_model, 'path'):
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
     def model(self, x):
@@ -79,7 +88,8 @@ class YOLOv2_update_base(chainer.Chain):
         h = F.leaky_relu(self.bn11(self.conv11(h)), slope=0.1)
         h = F.leaky_relu(self.bn12(self.conv12(h)), slope=0.1)
         h = F.leaky_relu(self.bn13(self.conv13(h)), slope=0.1)
-        high_resolution_feature = reorg(h)
+        high_resolution_feature = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
+        high_resolution_feature = reorg(high_resolution_feature)
         h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)
         h = F.leaky_relu(self.bn14(self.conv14(h)), slope=0.1)
         h = F.leaky_relu(self.bn15(self.conv15(h)), slope=0.1)
@@ -89,7 +99,7 @@ class YOLOv2_update_base(chainer.Chain):
 
         h = F.leaky_relu(self.bn19(self.conv19(h)), slope=0.1)
         h = F.leaky_relu(self.bn20(self.conv20(h)), slope=0.1)
-        h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
+
         h = F.concat((high_resolution_feature, h), axis=1)
         h = F.leaky_relu(self.bn22(self.conv22(h)), slope=0.1)
         return self.conv23(h)

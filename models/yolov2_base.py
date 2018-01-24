@@ -32,6 +32,9 @@ def print_timer(start, stop, sentence="Time"):
     print(sentence, elapsed_time)
     return elapsed_time
 
+def parse_dic(dic, key):
+    return None if dic is None or not key in dic else dic[key]
+
 
 class YOLOv2_base(chainer.Chain):
     """Implementation of YOLOv2(416*416).
@@ -40,6 +43,11 @@ class YOLOv2_base(chainer.Chain):
         super(YOLOv2_base, self).__init__()
         self.n_boxes = config['n_boxes']
         self.n_classes = config['n_classes']
+        self.anchors = parse_dic(config, "anchors")
+        self.object_scale = parse_dic(config, "object_scale")
+        self.nonobject_scale = parse_dic(config, "nonobject_scale")
+        self.coord_scale = parse_dic(config, "coord_scale")
+        self.thresh = parse_dic(config, "thresh")
 
         with self.init_scope():
             self.conv1  = L.Convolution2D(3, 32, ksize=3,
@@ -103,11 +111,11 @@ class YOLOv2_base(chainer.Chain):
             out_ch = self.n_boxes * (5 + self.n_classes)
             self.conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
-        if pretrained_model['download']:
+        if parse_dic(pretrained_model, 'download'):
             if not os.path.exists(pretrained_model['download'].split("/")[-1]):
                 subprocess.call(['wget', pretrained_model['download']])
 
-        if pretrained_model['path']:
+        if parse_dic(pretrained_model, 'path'):
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
     def model(self, x):

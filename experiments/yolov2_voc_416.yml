@@ -11,8 +11,15 @@ model:
     path: # 0000_model.npz
     download: # https://0000_model.npz
   architecture:
-    n_classes: 80
+    n_classes: 20
     n_boxes: 5
+    anchors: [1.08,1.19,  3.42,4.41,  6.63,11.38,
+              9.42,5.11,  16.62,10.52]
+    object_scale: 5
+    noobject_scale: 1
+    class_scale: 1
+    coord_scale: 1
+    thresh :  .6
 
 dataset:
   train:
