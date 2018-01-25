@@ -179,10 +179,10 @@ class YOLOv2_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-            start, stop = create_timer()
+            # start, stop = create_timer()
             output = self.model(imgs).data
-            print_timer(start, stop, sentence="Model inference time")
-            start, stop = create_timer()
+            # print_timer(start, stop, sentence="Model inference time")
+            # start, stop = create_timer()
             N, input_channel, input_h, input_w = imgs.shape
             N, _, out_h, out_w = output.shape
             shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
@@ -205,6 +205,6 @@ class YOLOv2_base(chainer.Chain):
             bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h
             bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w
             bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h
-
-            print_timer(start, stop, sentence="Post processing time")
+            # print_timer(start, stop, sentence="Inference time")
+            # print_timer(start, stop, sentence="Post processing time")
             return bbox_pred, conf, prob
