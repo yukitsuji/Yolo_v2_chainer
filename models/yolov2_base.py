@@ -173,10 +173,7 @@ class YOLOv2_base(chainer.Chain):
             imgs(array): Shape is (1, 3, H, W)
 
         Returns:
-            box_x(array): Shape is (1, box, out_h, out_w)
-            box_y(array): Shape is (1, box, out_h, out_w)
-            box_w(array): Shape is (1, box, out_h, out_w)
-            box_h(array): Shape is (1, box, out_h, out_w)
+            bbox_pred(array): Shape is (1, box, out_h, out_w, 4)
             conf(array): Shape is (1, box, out_h, out_w)
             prob(array): Shape is (1, box, class, out_h, out_w)
         """
@@ -194,7 +191,7 @@ class YOLOv2_base(chainer.Chain):
             wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
             conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
             prob = F.softmax(prob, axis=2).data # shape is (N, n_boxes, n_classes, out_h, out_w)
-            shape = (N, n_boxes, out_h, out_w)
+            shape = (N, self.n_boxes, out_h, out_w)
             x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
             y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
             if self.anchors.ndim != 4:
@@ -206,8 +203,8 @@ class YOLOv2_base(chainer.Chain):
             bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
             bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w
             bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h
-            bbox_pred[:, :, :, :, 2] = wh[:, :, 0].data * w_anchor / out_w
-            bbox_pred[:, :, :, :, 3] = wh[:, :, 1].data * h_anchor / out_h
+            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w
+            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h
 
             print_timer(start, stop, sentence="Post processing time")
             return bbox_pred, conf, prob

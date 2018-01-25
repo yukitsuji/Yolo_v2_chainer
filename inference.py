@@ -16,8 +16,10 @@ import cv2
 from config_utils import *
 import matplotlib.pyplot as plt
 
-chainer.cuda.set_max_workspace_size(1024 * 1024 * 1024)
+chainer.cuda.set_max_workspace_size(chainer.cuda.get_max_workspace_size())
 os.environ["CHAINER_TYPE_CHECK"] = "0"
+chainer.global_config.autotune = True
+chainer.global_config.type_check = False
 
 from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
@@ -40,7 +42,7 @@ def demo_yolov2():
     #     batch = chainer.dataset.concat_examples(batch, devices['main'])
     # pred_depth, pred_pose, pred_mask = model.inference(*batch)
     for i in range(10):
-        imgs = chainer.cuda.to_gpu(np.zeros((1, 3, 320, 320), dtype='f'), device=devices['main']) + i
+        imgs = chainer.cuda.to_gpu(np.zeros((1, 3, 416, 416), dtype='f'), device=devices['main']) + i
         model.inference(imgs)
     # depth = chainer.cuda.to_cpu(pred_depth.data[0, 0])
     # depth = normalize_depth_for_display(depth)
