@@ -16,6 +16,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable
+from models.reorg_layer import reorg
 
 def create_timer():
     start = chainer.cuda.Event()
@@ -35,9 +36,6 @@ def print_timer(start, stop, sentence="Time"):
 def parse_dic(dic, key):
     return None if dic is None or not key in dic else dic[key]
 
-def reorg(inputs):
-    N, in_ch, H, W = inputs.shape
-    return F.reshape(inputs, (N, -1, H // 2, W // 2))
 
 class YOLOv2_base(chainer.Chain):
     """Implementation of YOLOv2(416*416).
@@ -189,8 +187,6 @@ class YOLOv2_base(chainer.Chain):
             xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=2)
             xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
             wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
-            conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
-            prob = F.softmax(prob, axis=2).data # shape is (N, n_boxes, n_classes, out_h, out_w)
             shape = (N, self.n_boxes, out_h, out_w)
             x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
             y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
@@ -205,6 +201,8 @@ class YOLOv2_base(chainer.Chain):
             bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h
             bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w
             bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h
+            conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
+            prob = F.softmax(prob, axis=2).data # shape is (N, n_boxes, n_classes, out_h, out_w)
             # print_timer(start, stop, sentence="Inference time")
             # print_timer(start, stop, sentence="Post processing time")
             return bbox_pred, conf, prob

@@ -28,12 +28,12 @@ python inference.py --img /path/to/img.png --width 1024 --height 512
 ## Model Comparison from Darknet
 | Model | Dataset | cfg | darknet weight | Chainer | orig fps | chainer fps |
 |:--------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
-| **YOLOv2** | **VOC2007+20012** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | |
+| **YOLOv2** | **VOC2007+20012** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | | **58.8** | **100** |
 | **YOLOv2 544×544** | **VOC2007+20012** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | |
 | **Tiny YOLO** | **VOC2007+20012** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo-voc.weights)** | |
 | **YOLOv2 608×608** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.cfg)** | **[link](https://pjreddie.com/media/files/yolo.weights)** | |
 | **Tiny YOLO** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo.weights)** | |
-| **prior version(YOLOv2)** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.2.0.cfg)** | **[link](https://drive.google.com/open?id=0B4kMaWAXZNSWcUJCVW1aOHV0MkU)** || **58.8** | **83.3**
+| **prior version(YOLOv2)** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.2.0.cfg)** | **[link](https://drive.google.com/open?id=0B4kMaWAXZNSWcUJCVW1aOHV0MkU)** ||  | **83.3**
 
 ## Darknetを読んで
 - GroundTruthは、一枚ごとに30個以内（インスタンス）と仮定している。

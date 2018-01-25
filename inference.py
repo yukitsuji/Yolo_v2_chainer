@@ -65,7 +65,10 @@ def demo_yolov2():
 
     start, stop = create_timer()
     imgs = chainer.cuda.to_gpu(img, device=devices['main'])
-    model.inference(imgs)
+    bbox_pred, conf, prob = model.inference(imgs)
+    bbox_pred = chainer.cuda.to_cpu(bbox_pred)
+    conf = chainer.cuda.to_cpu(conf)
+    prob = chainer.cuda.to_cpu(prob)
     print_timer(start, stop, sentence="Inference time")
 
 
