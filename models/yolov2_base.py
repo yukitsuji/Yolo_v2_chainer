@@ -164,16 +164,16 @@ class YOLOv2_base(chainer.Chain):
         output = self.model(imgs)
         return total_loss
 
-    def inference(self, imgs):
+    def inference(self, imgs, orig_shape):
         """Inference.
 
         Args:
             imgs(array): Shape is (1, 3, H, W)
 
         Returns:
-            bbox_pred(array): Shape is (1, box, out_h, out_w, 4)
-            conf(array): Shape is (1, box, out_h, out_w)
-            prob(array): Shape is (1, box, class, out_h, out_w)
+            bbox_pred(array): Shape is (1, box * out_h * out_w, 4)
+            conf(array): Shape is (1, box * out_h * out_w)
+            prob(array): Shape is (1, box * out_h * out_w, n_class)
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
@@ -197,12 +197,16 @@ class YOLOv2_base(chainer.Chain):
             w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
             h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
             bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
-            bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w
-            bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h
-            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w
-            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h
+            bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * orig_shape[1]
+            bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * orig_shape[0]
+            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * orig_shape[1]
+            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * orig_shape[0]
             conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
-            prob = F.softmax(prob, axis=2).data # shape is (N, n_boxes, n_classes, out_h, out_w)
+            prob = prob.transpose(0, 1, 3, 4, 2)
+            prob = F.softmax(prob, axis=4).data # shape is (N, n_boxes, out_h, out_w, n_classes)
             # print_timer(start, stop, sentence="Inference time")
             # print_timer(start, stop, sentence="Post processing time")
+            bbox_pred = bbox_pred.reshape(-1, 4)
+            conf = conf.reshape(-1)
+            prob = prob.reshape(-1, self.n_classes)
             return bbox_pred, conf, prob

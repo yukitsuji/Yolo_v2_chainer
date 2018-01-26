@@ -37,11 +37,11 @@ def load_img_like_darknet(img_path, h, w):
     else:
         new_h = h
         new_w = int(w * (new_h / h))
-    img = cv2.resize(img, (new_w, new_h))
+    img = cv2.resize(img, (new_w, new_h))[:, :, ::-1]
     delta_h = new_h - h
     delta_w = new_w - w
     img = img[delta_h : delta_h + h, delta_w : delta_w + w]
-    return img.transpose(2, 0, 1)[np.newaxis].astype('f')
+    return img.transpose(2, 0, 1)[np.newaxis].astype('f') / 255.0, (orig_h, orig_w)
 
 
 def demo_yolov2():
@@ -53,23 +53,34 @@ def demo_yolov2():
     #test_iter = create_iterator_test(test_data,
     #                                 config['iterator'])
     model.to_gpu(devices['main'])
-    h, w = 416, 416
-    img = load_img_like_darknet(img_path, h, w)
+    h, w = 608, 608
+    thresh = 0.001
+    img, orig_shape = load_img_like_darknet(img_path, h, w)
     # for batch in test_iter:
     #     input_img = batch[0][0].transpose(1, 2, 0)
     #     batch = chainer.dataset.concat_examples(batch, devices['main'])
-    # pred_depth, pred_pose, pred_mask = model.inference(*batch)
-    for i in range(10):
+    #     pred_depth, pred_pose, pred_mask = model.inference(*batch)
+    for i in range(2):
         imgs = chainer.cuda.to_gpu(np.zeros((1, 3, h, w), dtype='f'), device=devices['main']) + i
-        model.inference(imgs)
+        model.inference(imgs, orig_shape)
 
     start, stop = create_timer()
     imgs = chainer.cuda.to_gpu(img, device=devices['main'])
-    bbox_pred, conf, prob = model.inference(imgs)
+    bbox_pred, conf, prob = model.inference(imgs, orig_shape)
     bbox_pred = chainer.cuda.to_cpu(bbox_pred)
     conf = chainer.cuda.to_cpu(conf)
     prob = chainer.cuda.to_cpu(prob)
     print_timer(start, stop, sentence="Inference time")
+
+    # NMS(クラスごとにsortを繰り返し、IOUで比較を行う)
+    cls_inds = np.argmax(prob, axis=1)
+    prob = prob[np.arange(prob.shape[0]), cls_inds]
+    prob = conf * prob
+    is_index = np.where(prob >= thresh)
+    bbox_pred = bbox_pred[is_index]
+    prob = prob[is_index]
+    print(bbox_pred.shape, prob.shape)
+    # Visualize
 
 
 def main():

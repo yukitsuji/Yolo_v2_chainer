@@ -8,8 +8,8 @@ model:
   module: models.yolov2_base
   name: YOLOv2_base
   pretrained_model:
-    path: # 0000_model.npz
-    download: # https://0000_model.npz
+    path: hoge.npz
+    download:
   architecture:
     n_classes: 80
     n_boxes: 5

@@ -8,7 +8,7 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: # 0000_model.npz
+    path: hoge2.npz
     download: # https://0000_model.npz
   architecture:
     n_classes: 80
