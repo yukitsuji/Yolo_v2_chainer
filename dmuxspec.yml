@@ -1,0 +1,23 @@
+version: 0
+os: ubuntu==16.04
+features:
+- cuda==8.0
+- python==3
+- cudnn==5.1
+- cupy==4.0.0b1
+- nccl==1.3.4
+- chainercv==0.7.0
+- opencv==3.2.0
+- pip:argparse==1.4.0
+- pip:scikit-learn==0.18.1
+- pip:Cython==0.27.3
+- pip:PyYAML==3.12
+- pip:scipy==1.0.0
+- chainer==4.0.0b1
+hardware:
+- cpu==12
+- ram==128419
+- disk==5000
+- gpu==4
+# datasets:
+# - yukitsuji==1 @ /home/user/.chainer/dataset/pfnet/chainer/kitti_detection

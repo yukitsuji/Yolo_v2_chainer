@@ -1,6 +1,6 @@
 end_trigger: [200000, "iteration"] # 3200 / 16 = 200 * 150 = 30000
 results: results
-gpus: [0]
+gpus: []
 mode: Test
 seed: 1
 
@@ -8,13 +8,13 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: hoge2.npz
+    path: weight/chainer_weight/yolov2_update_coco_608.npz
     download: # https://0000_model.npz
   architecture:
     n_classes: 80
     n_boxes: 5
-    anchors: [0.738768,0.874946,  2.42204,2.65704,
-              4.30971,7.04493,  10.246,4.59428,  12.6868,11.8741]
+    anchors: [0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434,
+              7.88282, 3.52778, 9.77052, 9.16828]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1

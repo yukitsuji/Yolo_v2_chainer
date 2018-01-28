@@ -43,13 +43,6 @@ class YOLOv2_update_base(YOLOv2_base):
     """
     def __init__(self, config, pretrained_model=None):
         super(YOLOv2_update_base, self).__init__(config)
-        # self.n_boxes = config['n_boxes']
-        # self.n_classes = config['n_classes']
-        # self.anchors = parse_dic(config, "anchors")
-        # self.object_scale = parse_dic(config, "object_scale")
-        # self.nonobject_scale = parse_dic(config, "nonobject_scale")
-        # self.coord_scale = parse_dic(config, "coord_scale")
-        # self.thresh = parse_dic(config, "thresh")
 
         with self.init_scope():
             delattr(self, 'conv21'); delattr(self, 'bn21')

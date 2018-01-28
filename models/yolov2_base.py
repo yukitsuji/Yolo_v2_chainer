@@ -164,11 +164,12 @@ class YOLOv2_base(chainer.Chain):
         output = self.model(imgs)
         return total_loss
 
-    def inference(self, imgs, orig_shape):
+    def inference(self, imgs, img_shape):
         """Inference.
 
         Args:
             imgs(array): Shape is (1, 3, H, W)
+            img_shape: (H, W)
 
         Returns:
             bbox_pred(array): Shape is (1, box * out_h * out_w, 4)
@@ -191,16 +192,17 @@ class YOLOv2_base(chainer.Chain):
             x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
             y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
             if self.anchors.ndim != 4:
-                n_device = chainer.cuda.get_device(output)
-                self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
+                n_device = chainer.cuda.get_device_from_array(output)
+                if n_device.id != -1:
+                    self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
                 self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
             w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
             h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
             bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
-            bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * orig_shape[1]
-            bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * orig_shape[0]
-            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * orig_shape[1]
-            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * orig_shape[0]
+            bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
+            bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
+            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * img_shape[1]
+            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * img_shape[0]
             conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
             prob = prob.transpose(0, 1, 3, 4, 2)
             prob = F.softmax(prob, axis=4).data # shape is (N, n_boxes, out_h, out_w, n_classes)

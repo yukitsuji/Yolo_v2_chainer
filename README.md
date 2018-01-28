@@ -23,7 +23,24 @@ python to_chainer_converter.py --orig /path/to/original_model --name yolo_v2_cha
 ## Inference
 ```bash
 python inference.py --img /path/to/img.png --width 1024 --height 512
+nms: by class(do_nms_sort)
+nms_thresh = 0.3
+img_thresh = ?
 ```
+
+## Validation
+```bash
+# TODO
+nms: by class(do_nms_sort)
+nms_thresh = 0.45
+img_thresh = 0.005
+後で
+```
+
+## NMS
+- do_nms_sort: class毎にnmsを行う
+- do_nms_obj: class関係なく最も確率が高いclassでsortして、比較する
+-
 
 ## Model Comparison from Darknet
 | Model | Dataset | cfg | darknet weight | Chainer | orig fps | chainer fps |
