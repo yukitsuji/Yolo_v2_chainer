@@ -17,6 +17,8 @@ import chainer.functions as F
 import chainer.links as L
 from chainer import Variable
 from models.reorg_layer import reorg
+from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
+
 
 def create_timer():
     start = chainer.cuda.Event()
@@ -49,6 +51,9 @@ class YOLOv2_base(chainer.Chain):
         self.nonobject_scale = parse_dic(config, "nonobject_scale")
         self.coord_scale = parse_dic(config, "coord_scale")
         self.thresh = parse_dic(config, "thresh")
+        self.width = parse_dic(config, "width")
+        self.height = parse_dic(config, "height")
+        self.nms_method = parse_dic(config, 'nms')
 
         if self.anchors:
             self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
@@ -164,6 +169,86 @@ class YOLOv2_base(chainer.Chain):
         output = self.model(imgs)
         return total_loss
 
+    def prepare(self, imgs):
+        batchsize = len(imgs)
+        input_imgs = np.zeros((batchsize, 3, self.height, self.width), 'f')
+        input_imgs += 127.5
+        orig_sizes = np.zeros((batchsize, 2), dtype='f')
+        delta_sizes = np.zeros((batchsize, 2), dtype='f')
+        for b in batchsize:
+            img = imgs[b]
+            _, orig_h, orig_w = img.shape
+            if (orig_h / self.height) > (orig_w / self.width):
+                new_h = self.height
+                new_w = int(orig_w / (orig_h / self.height))
+            else:
+                new_w = self.width
+                new_h = int(orig_h / (orig_w / self.width))
+
+            orig_img = F.resize_images(img[np.newaxis, :], (new_w, new_h)).data
+            orig_shape = orig_img.shape[2:]
+            delta_h = int(abs((new_h - self.height) / 2))
+            delta_w = int(abs((new_w - self.width) / 2))
+            img = img / 255.
+            input_imgs[b, :, delta_h:new_h+delta_wh, delta_w:new_w+delta_w] = img
+            orig_sizes[b] = [orig_h, orig_w]
+            delta_sizes[b] = [delta_h, delta_w]
+        input_imgs = self.xp.array(input_imgs)
+        return input_imgs, orig_sizes, delta_sizes
+
+    def evaluation(self, imgs):
+        """Inference.
+
+        Args:
+            imgs(array): Shape is (N, 3, H, W)
+            img_shape: (H, W)
+
+        Returns:
+            bbox_pred(array): Shape is (1, box * out_h * out_w, 4)
+            conf(array): Shape is (1, box * out_h * out_w)
+            prob(array): Shape is (1, box * out_h * out_w, n_class)
+        """
+        with chainer.using_config('train', False), \
+                 chainer.function.no_backprop_mode():
+
+            # Prepare images for model.
+            input_imgs, orig_sizes, delta_sizes = self.prepare(imgs)
+            bbox_pred, conf, prob = self.model.inference(input_imgs,
+                                                         (self.height, self.width))
+            bbox_pred = bbox_pred.reshape(N, -1, 4)
+            conf = conf.reshape(N, -1)
+            prob = prob.reshape(N, -1, self.n_classes)
+            bbox_preds = chainer.cuda.to_cpu(bbox_pred)
+            confs = chainer.cuda.to_cpu(conf)
+            probs = chainer.cuda.to_cpu(prob)
+
+            bboxes = []
+            labels = []
+            scores = []
+            for bbox_pred, conf, prob in zip(bbox_preds, confs, probs):
+                # Post processing
+                if args.nms == 'class':
+                    bbox_pred, prob, cls_inds, index = \
+                        select_bbox_by_class(bbox_pred, conf, prob,
+                                             thresh, nms_thresh)
+                else:
+                    bbox_pred, prob, cls_inds = \
+                        select_bbox_by_obj(bbox_pred, conf, prob,
+                                           thresh, nms_thresh)
+
+                bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
+                bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
+                bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
+                bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
+                bbox_pred[:, ::2] -= delta[1]
+                bbox_pred[:, 1::2] -= delta[0]
+                bbox_pred = clip_bbox(bbox_pred, orig_shape)
+
+                bboxes.append(bbox_pred)
+                labels.append(cls_inds)
+                scores.append(prob)
+            return bboxes, labels, scores
+
     def inference(self, imgs, img_shape):
         """Inference.
 
@@ -203,7 +288,4 @@ class YOLOv2_base(chainer.Chain):
             conf = F.sigmoid(conf[:, :, 0]).data
             prob = prob.transpose(0, 1, 3, 4, 2)
             prob = F.softmax(prob, axis=4).data
-            bbox_pred = bbox_pred.reshape(-1, 4)
-            conf = conf.reshape(-1)
-            prob = prob.reshape(-1, self.n_classes)
             return bbox_pred, conf, prob

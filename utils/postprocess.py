@@ -4,17 +4,38 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.cython_util.nms_by_class import nms_by_class, nms_by_obj
 
-def nms_by_class(bbox_pred, prob):
-    """NMS by each class.
+def select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh):
+    prob_shape = prob.shape
+    prob = np.broadcast_to(conf[:, None], prob_shape) * prob
+    prob = prob.transpose(1, 0)
+    sort_index = np.argsort(prob, axis=1)[:, ::-1].astype(np.int32)
+    prob = prob.transpose(1, 0)
+    sort_index = sort_index.transpose(1, 0)
+    index = nms_by_class(bbox_pred, prob, sort_index, thresh, nms_thresh)
+    index = np.asarray(index, dtype='i')
+    bbox_pred = bbox_pred[index[:, 0]]
+    prob = prob[index[:, 0], index[:, 1]]
+    cls_inds = index[:, 1]
+    return bbox_pred, prob, cls_inds, index
 
-    Args:
-        bbox_pred(array): Shape is (N, 4)
-        prob(array): Shape is (N, class, 4)
-    Returns:
-
-    """
-    pass
+def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thrsh):
+    cls_inds = np.argmax(prob, axis=1)
+    prob = prob[np.arange(prob.shape[0]), cls_inds]
+    prob = conf * prob
+    is_index = np.where(prob >= thresh)
+    bbox_pred = bbox_pred[is_index]
+    prob = prob[is_index]
+    sort_index = np.argsort(prob)[::-1]
+    bbox_pred = bbox_pred[sort_index]
+    prob = prob[sort_index]
+    cls_inds = cls_inds[is_index][sort_index]
+    index = nms_by_obj(bbox_pred, prob, nms_thresh)
+    bbox_pred = bbox_pred[index]
+    prob = prob[index]
+    cls_inds = cls_inds[index]
+    return bbox_pred, prob, cls_inds
 
 def visualize_with_label(img, bbox_pred, prob, names, ax=None, index=None):
     """Visualize image with labels."""

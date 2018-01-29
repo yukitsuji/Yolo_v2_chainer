@@ -30,7 +30,7 @@ nms_thresh = 0.3
 img_thresh = ?
 ```
 
-## Validation
+## Evaluation
 ```bash
 # TODO
 nms: by class

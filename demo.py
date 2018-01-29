@@ -24,9 +24,8 @@ subprocess.call(['sh', 'setup.sh'])
 from config_utils import *
 from models.yolov2_base import *
 from utils.image_loader import load_img_like_darknet
-from utils.cython_util.nms_by_class import nms_by_class, nms_by_obj
-# nms_by_obj
 from utils.postprocess import visualize_with_label, clip_bbox
+from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
 
 chainer.cuda.set_max_workspace_size(chainer.cuda.get_max_workspace_size())
 os.environ["CHAINER_TYPE_CHECK"] = "0"
@@ -50,7 +49,6 @@ def demo_yolov2():
     w = args.width
     thresh = args.thresh
     nms_thresh = args.nms_thresh
-    nms_method = nms_by_class if args.nms == 'class' else nms_by_obj
     label_names = open(args.name, 'r').read().split('\n')[:-1]
 
     orig_img, img, delta = load_img_like_darknet(img_path, h, w)
@@ -70,6 +68,9 @@ def demo_yolov2():
     else:
         start = time.time()
     bbox_pred, conf, prob = model.inference(img, img_shape)
+    bbox_pred = bbox_pred.reshape(-1, 4)
+    conf = conf.reshape(-1)
+    prob = prob.reshape(-1, model.n_classes)
     bbox_pred = chainer.cuda.to_cpu(bbox_pred)
     conf = chainer.cuda.to_cpu(conf)
     prob = chainer.cuda.to_cpu(prob)
@@ -80,34 +81,14 @@ def demo_yolov2():
 
     # Post processing
     start = time.time()
-    if nms_method == nms_by_class:
-        prob_shape = prob.shape
-        prob = np.broadcast_to(conf[:, None], prob_shape) * prob
-        prob = prob.transpose(1, 0)
-        sort_index = np.argsort(prob, axis=1)[:, ::-1].astype(np.int32)
-        prob = prob.transpose(1, 0)
-        sort_index = sort_index.transpose(1, 0)
-        index = nms_by_class(bbox_pred, prob, sort_index, thresh, nms_thresh)
-        index = np.asarray(index, dtype='i')
-        bbox_pred = bbox_pred[index[:, 0]]
-        prob = prob[index[:, 0], index[:, 1]]
-        cls_inds = index[:, 1]
-
-    elif nms_method == nms_by_obj:
-        cls_inds = np.argmax(prob, axis=1)
-        prob = prob[np.arange(prob.shape[0]), cls_inds]
-        prob = conf * prob
-        is_index = np.where(prob >= thresh)
-        bbox_pred = bbox_pred[is_index]
-        prob = prob[is_index]
-        sort_index = np.argsort(prob)[::-1]
-        bbox_pred = bbox_pred[sort_index]
-        prob = prob[sort_index]
-        cls_inds = cls_inds[is_index][sort_index]
-        index = nms_by_obj(bbox_pred, prob, nms_thresh)
-        bbox_pred = bbox_pred[index]
-        prob = prob[index]
-        cls_inds = cls_inds[index]
+    if args.nms == 'class':
+        bbox_pred, prob, cls_inds, index = select_bbox_by_class(bbox_pred,
+                                                                conf, prob,
+                                                                thresh,
+                                                                nms_thresh)
+    else:
+        bbox_pred, prob, cls_inds = select_bbox_by_obj(bbox_pred, conf, prob,
+                                                       thresh, nms_thresh)
 
     bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
     bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
@@ -123,7 +104,7 @@ def demo_yolov2():
     print(pred_names)
 
     # Visualize
-    index = index[:, 0] if nms_method == nms_by_class else None
+    index = index[:, 0] if args.nms == 'class' else None
     ax = visualize_with_label(orig_img, bbox_pred, prob, pred_names,
                               index=index)
     if args.save:
