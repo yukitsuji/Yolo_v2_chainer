@@ -33,7 +33,6 @@ from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
     lambda loader, node: OrderedDict(loader.construct_pairs(node)))
 
-
 SEED = 0
 
 def parse_dict(dic, key, value=None):

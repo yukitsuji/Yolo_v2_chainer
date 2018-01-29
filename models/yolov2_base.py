@@ -18,7 +18,7 @@ import chainer.links as L
 from chainer import Variable
 from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
-
+from utils.postprocess import clip_bbox
 
 def create_timer():
     start = chainer.cuda.Event()
@@ -51,9 +51,10 @@ class YOLOv2_base(chainer.Chain):
         self.nonobject_scale = parse_dic(config, "nonobject_scale")
         self.coord_scale = parse_dic(config, "coord_scale")
         self.thresh = parse_dic(config, "thresh")
+        self.nms_thresh = parse_dic(config, "nms_thresh")
         self.width = parse_dic(config, "width")
         self.height = parse_dic(config, "height")
-        self.nms_method = parse_dic(config, 'nms')
+        self.nms = parse_dic(config, 'nms')
 
         if self.anchors:
             self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
@@ -172,10 +173,10 @@ class YOLOv2_base(chainer.Chain):
     def prepare(self, imgs):
         batchsize = len(imgs)
         input_imgs = np.zeros((batchsize, 3, self.height, self.width), 'f')
-        input_imgs += 127.5
+        input_imgs += 0.5
         orig_sizes = np.zeros((batchsize, 2), dtype='f')
         delta_sizes = np.zeros((batchsize, 2), dtype='f')
-        for b in batchsize:
+        for b in range(batchsize):
             img = imgs[b]
             _, orig_h, orig_w = img.shape
             if (orig_h / self.height) > (orig_w / self.width):
@@ -185,15 +186,16 @@ class YOLOv2_base(chainer.Chain):
                 new_w = self.width
                 new_h = int(orig_h / (orig_w / self.width))
 
-            orig_img = F.resize_images(img[np.newaxis, :], (new_w, new_h)).data
-            orig_shape = orig_img.shape[2:]
+            img = F.resize_images(img[np.newaxis, :], (new_h, new_w)).data
             delta_h = int(abs((new_h - self.height) / 2))
             delta_w = int(abs((new_w - self.width) / 2))
             img = img / 255.
-            input_imgs[b, :, delta_h:new_h+delta_wh, delta_w:new_w+delta_w] = img
-            orig_sizes[b] = [orig_h, orig_w]
-            delta_sizes[b] = [delta_h, delta_w]
-        input_imgs = self.xp.array(input_imgs)
+            input_imgs[b, :, delta_h:new_h+delta_h, delta_w:new_w+delta_w] = img
+            orig_sizes[b] = [orig_h, orig_w] # TODO
+            delta_sizes[b] = [delta_h, delta_w] # TODO
+            # print(" ", orig_h, orig_w, img.shape, delta_h, delta_w)
+
+        input_imgs = self.xp.array(input_imgs, dtype='f')
         return input_imgs, orig_sizes, delta_sizes
 
     def evaluation(self, imgs):
@@ -213,38 +215,51 @@ class YOLOv2_base(chainer.Chain):
 
             # Prepare images for model.
             input_imgs, orig_sizes, delta_sizes = self.prepare(imgs)
-            bbox_pred, conf, prob = self.model.inference(input_imgs,
-                                                         (self.height, self.width))
-            bbox_pred = bbox_pred.reshape(N, -1, 4)
-            conf = conf.reshape(N, -1)
-            prob = prob.reshape(N, -1, self.n_classes)
+            bbox_pred, conf, prob = self.inference(input_imgs,
+                                                   (self.height, self.width))
+            batchsize = len(input_imgs)
+            bbox_pred = bbox_pred.reshape(batchsize, -1, 4)
+            conf = conf.reshape(batchsize, -1)
+            prob = prob.reshape(batchsize, -1, self.n_classes)
             bbox_preds = chainer.cuda.to_cpu(bbox_pred)
             confs = chainer.cuda.to_cpu(conf)
             probs = chainer.cuda.to_cpu(prob)
 
-            bboxes = []
-            labels = []
-            scores = []
-            for bbox_pred, conf, prob in zip(bbox_preds, confs, probs):
+            bboxes, labels, scores = [], [], []
+            for bbox_pred, conf, prob, orig_size, delta_size in \
+                zip(bbox_preds, confs, probs, orig_sizes, delta_sizes):
                 # Post processing
-                if args.nms == 'class':
+                if self.nms == 'class':
                     bbox_pred, prob, cls_inds, index = \
                         select_bbox_by_class(bbox_pred, conf, prob,
-                                             thresh, nms_thresh)
+                                             self.thresh, self.nms_thresh)
                 else:
-                    bbox_pred, prob, cls_inds = \
+                    bbox_pred, prob, cls_inds, index = \
                         select_bbox_by_obj(bbox_pred, conf, prob,
-                                           thresh, nms_thresh)
-
-                bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
-                bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
-                bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
-                bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
-                bbox_pred[:, ::2] -= delta[1]
-                bbox_pred[:, 1::2] -= delta[0]
-                bbox_pred = clip_bbox(bbox_pred, orig_shape)
-
-                bboxes.append(bbox_pred)
+                                           self.thresh, self.nms_thresh)
+                if len(bbox_pred):
+                    bbox_pred_yx = bbox_pred.copy()
+                    bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
+                    bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
+                    bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
+                    bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
+                    bbox_pred[:, ::2] -= delta_size[1]
+                    bbox_pred[:, 1::2] -= delta_size[0]
+                    # TODO: expand to original size
+                    expand = orig_size[1] / self.width if orig_size[0] < orig_size[1] else orig_size[0] / self.height
+                    bbox_pred *= expand
+                    # Clip
+                    bbox_pred = clip_bbox(bbox_pred, orig_size)
+                    # convert (x, y) to (y, x)
+                    bbox_pred_yx[:, 0] = bbox_pred[:, 1]
+                    bbox_pred_yx[:, 1] = bbox_pred[:, 0]
+                    bbox_pred_yx[:, 2] = bbox_pred[:, 3]
+                    bbox_pred_yx[:, 3] = bbox_pred[:, 2]
+                else:
+                    bbox_pred_yx = [[]]
+                    labels = []
+                    prob = []
+                bboxes.append(bbox_pred_yx)
                 labels.append(cls_inds)
                 scores.append(prob)
             return bboxes, labels, scores

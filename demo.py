@@ -82,13 +82,11 @@ def demo_yolov2():
     # Post processing
     start = time.time()
     if args.nms == 'class':
-        bbox_pred, prob, cls_inds, index = select_bbox_by_class(bbox_pred,
-                                                                conf, prob,
-                                                                thresh,
-                                                                nms_thresh)
+        bbox_pred, prob, cls_inds, index = \
+            select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh)
     else:
-        bbox_pred, prob, cls_inds = select_bbox_by_obj(bbox_pred, conf, prob,
-                                                       thresh, nms_thresh)
+        bbox_pred, prob, cls_inds, index = \
+            select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thresh)
 
     bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
     bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y

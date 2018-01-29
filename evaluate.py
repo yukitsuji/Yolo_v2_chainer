@@ -56,7 +56,7 @@ def main():
         model.to_gpu(args.gpu)
 
     dataset = VOCBboxDataset(
-        data_dir="../dataset/VOC_test/VOC2007_test",
+        data_dir="../dataset/voc/VOC_test/VOC2007_test",
         year='2007', split='test', use_difficult=True, return_difficult=True)
     iterator = iterators.SerialIterator(
         dataset, args.batchsize, repeat=False, shuffle=False)

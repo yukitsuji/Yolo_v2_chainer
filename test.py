@@ -20,9 +20,8 @@ subprocess.call(['sh', 'setup.sh'])
 from config_utils import *
 from models.yolov2_base import *
 from utils.image_loader import load_img_like_darknet
-from utils.cython_util.nms_by_class import * #nms_by_class, nms_by_obj
-# from utils.cython_util.nms_by_obj import nms_by_obj
 from utils.postprocess import visualize_with_label, clip_bbox
+from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
 
 chainer.cuda.set_max_workspace_size(chainer.cuda.get_max_workspace_size())
 os.environ["CHAINER_TYPE_CHECK"] = "0"
@@ -49,7 +48,6 @@ def test_yolov2():
     w = args.width
     thresh = args.thresh
     nms_thresh = args.nms_thresh
-    nms_method = nms_by_class if args.nms == 'class' else nms_by_obj
     label_names = open(args.name, 'r').read().split('\n')[:-1]
 
     for batch in test_iter:
@@ -64,29 +62,12 @@ def test_yolov2():
         print_timer(start, stop, sentence="Inference time")
 
         # NMS by each class
-        nms_method = nms_by_class
-        if nms_method == nms_by_class:
-            prob = np.broadcast_to(conf[:, None], prob.shape) * prob
-            is_index = np.where(prob >= thresh)
-            bbox_pred = bbox_pred[is_index]
-            prob = prob[is_index]
-            print(bbox_pred.shape, prob.shape)
-            bbox_pred, prob = nms_by_class(bbox_pred, prob, thresh, nms_thresh)
-        elif nms_method == nms_by_obj:
-            cls_inds = np.argmax(prob, axis=1)
-            prob = prob[np.arange(prob.shape[0]), cls_inds]
-            prob = conf * prob
-            is_index = np.where(prob >= thresh)
-            bbox_pred = bbox_pred[is_index]
-            prob = prob[is_index]
-            sort_index = np.argsort(prob)[::-1]
-            bbox_pred = bbox_pred[sort_index]
-            prob = prob[sort_index]
-            cls_inds = cls_inds[is_index][sort_index]
-            index = nms_by_obj(bbox_pred, prob, nms_thresh)
-            bbox_pred = bbox_pred[index]
-            prob = prob[index]
-            cls_inds = cls_inds[index]
+        if args.nms == 'class':
+            bbox_pred, prob, cls_inds, index = \
+                select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh)
+        else:
+            bbox_pred, prob, cls_inds, index = \
+                select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thresh)
 
         # Clip with and height
         bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x

@@ -15,10 +15,13 @@ def select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh):
     sort_index = sort_index.transpose(1, 0)
     index = nms_by_class(bbox_pred, prob, sort_index, thresh, nms_thresh)
     index = np.asarray(index, dtype='i')
-    bbox_pred = bbox_pred[index[:, 0]]
-    prob = prob[index[:, 0], index[:, 1]]
-    cls_inds = index[:, 1]
-    return bbox_pred, prob, cls_inds, index
+    if len(index):
+        bbox_pred = bbox_pred[index[:, 0]]
+        prob = prob[index[:, 0], index[:, 1]]
+        cls_inds = index[:, 1]
+        return bbox_pred, prob, cls_inds, index
+    else:
+        return [], [], [], []
 
 def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thrsh):
     cls_inds = np.argmax(prob, axis=1)
@@ -32,10 +35,13 @@ def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thrsh):
     prob = prob[sort_index]
     cls_inds = cls_inds[is_index][sort_index]
     index = nms_by_obj(bbox_pred, prob, nms_thresh)
-    bbox_pred = bbox_pred[index]
-    prob = prob[index]
-    cls_inds = cls_inds[index]
-    return bbox_pred, prob, cls_inds
+    if len(index):
+        bbox_pred = bbox_pred[index]
+        prob = prob[index]
+        cls_inds = cls_inds[index]
+        return bbox_pred, prob, cls_inds, None
+    else:
+        return [], [], [], []
 
 def visualize_with_label(img, bbox_pred, prob, names, ax=None, index=None):
     """Visualize image with labels."""

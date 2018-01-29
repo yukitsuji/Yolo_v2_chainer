@@ -1,0 +1,21 @@
+results: results
+gpus: []
+mode: Test
+seed: 1
+
+model:
+  module: models.yolov2_variants
+  name: YOLOv2_update_base
+  pretrained_model:
+    path: weight/chainer/yolov2_update_voc_416.npz
+    download: # https://0000_model.npz
+  architecture:
+    n_classes: 20
+    n_boxes: 5
+    anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
+    　　　　　　9.47112, 4.84053, 11.2364, 10.0071]
+    thresh : 0.005
+    nms_thresh: 0.45
+    width: 416
+    height: 416
+    nms: class
