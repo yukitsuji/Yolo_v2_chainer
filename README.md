@@ -22,10 +22,10 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit
 python to_chainer_converter.py --orig /path/to/original_model --name yolo_v2_chainer
 ```
 
-## Inference
+## demo
 ```bash
-python inference.py --img /path/to/img.png --width 1024 --height 512
-nms: by class(do_nms_sort)
+python demo.py experiments/yolov2_update_608_test.yml --img_path ./data/dog.jpg --thresh 0.20 --nms_thresh 0.3 --save dog
+nms: by class
 nms_thresh = 0.3
 img_thresh = ?
 ```
@@ -33,16 +33,10 @@ img_thresh = ?
 ## Validation
 ```bash
 # TODO
-nms: by class(do_nms_sort)
+nms: by class
 nms_thresh = 0.45
 img_thresh = 0.005
-後で
 ```
-
-## NMS
-- do_nms_sort: class毎にnmsを行う
-- do_nms_obj: class関係なく最も確率が高いclassでsortして、比較する
--
 
 ## Model Comparison from Darknet
 | Model | Dataset | cfg | darknet weight | Chainer | orig fps | chainer fps |
@@ -54,14 +48,14 @@ img_thresh = 0.005
 | **Tiny YOLO** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo.weights)** | | | |
 | **prior version(YOLOv2)** | **COCO** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.2.0.cfg)** | **[link](https://drive.google.com/open?id=0B4kMaWAXZNSWcUJCVW1aOHV0MkU)** | **[link](https://www.dropbox.com/s/vff05c4gb6dojft/yolov2_prior_coco_608.npz)**|  |  | |
 
-## Darknetを読んで
+<!-- ## Darknetを読んで
 - GroundTruthは、一枚ごとに30個以内（インスタンス）と仮定している。
 - loss関数の計算方法
 - まず、各pixel, anchor毎に、GroundTruthとIOU Matchingを行う。 もしmax iouが閾値を超えている場合、
   その領域の誤差を0とする。もし閾値を超えていなければ、noobject_scale * (0 - l.output[index])
   また、少ないbatch数(12800まで)のときには、すべての領域に関して、x, y, w, hの誤差を計算する。scaleは0.01
 - GroundTruthの(x, y, w, h)の値は、(x / img_w, y / img_h, exp(w * (anchor_w / img_w)))
-- Anchorの値の意味：
+- Anchorの値の意味： -->
 
 
 # TODO

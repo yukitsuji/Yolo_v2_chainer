@@ -11,7 +11,7 @@ from models.yolov2_variants import YOLOv2_update_base
 def parse_args():
     parser = argparse.ArgumentParser(
                  description="Converter from darknet to Chainer")
-    parser.add_argument('--model', default='pre', help='[normal, high, tiny]')
+    parser.add_argument('--model', default='pre', help='[pre, normal]')
     parser.add_argument('--orig', help="File name of darknet's model parameter")
     parser.add_argument('--name', help="File name of chainer's model parameter")
     parser.add_argument('--n_class', default=80, type=int, help="Number of class")
@@ -28,8 +28,10 @@ def to_chainer_converter():
         Model = YOLOv2_update_base
     elif args.model == 'high':
         raise("Not Implemented Error: High resolution Yolo")
-    else:
+    elif args.model == 'tiny':
         raise("Not Implemented Error: Tiny Yolo")
+    else:
+        raise("Not Implemented Error")
 
     config = {'n_classes':args.n_class, 'n_boxes':args.n_box}
     pretrained_model = {'download': None, 'path': None}
