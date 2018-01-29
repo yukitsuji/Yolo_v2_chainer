@@ -50,6 +50,7 @@ def parse_args():
     parser.add_argument('--nms', default='class', type=str, help='the way to nms')
     parser.add_argument('--name', default='datasets/coco/coco_names.txt',
                          type=str, help='Class names')
+    parser.add_argument('--gpu', default=-1, type=int)
     parser.add_argument('--save', default='prediction', type=str)
     args = parser.parse_args()
     config = yaml.load(open(args.config))

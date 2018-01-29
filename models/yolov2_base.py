@@ -178,10 +178,7 @@ class YOLOv2_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-            # start, stop = create_timer()
             output = self.model(imgs).data
-            # print_timer(start, stop, sentence="Model inference time")
-            # start, stop = create_timer()
             N, input_channel, input_h, input_w = imgs.shape
             N, _, out_h, out_w = output.shape
             shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
@@ -203,11 +200,9 @@ class YOLOv2_base(chainer.Chain):
             bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
             bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * img_shape[1]
             bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * img_shape[0]
-            conf = F.sigmoid(conf[:, :, 0]).data # shape is (N, n_boxes, out_h, out_w)
+            conf = F.sigmoid(conf[:, :, 0]).data
             prob = prob.transpose(0, 1, 3, 4, 2)
-            prob = F.softmax(prob, axis=4).data # shape is (N, n_boxes, out_h, out_w, n_classes)
-            # print_timer(start, stop, sentence="Inference time")
-            # print_timer(start, stop, sentence="Post processing time")
+            prob = F.softmax(prob, axis=4).data
             bbox_pred = bbox_pred.reshape(-1, 4)
             conf = conf.reshape(-1)
             prob = prob.reshape(-1, self.n_classes)
