@@ -39,7 +39,7 @@ def load_img_like_darknet(img_path, h, w):
     orig_shape = orig_img.shape[:2]
     delta_h = int(abs((new_h - h) / 2))
     delta_w = int(abs((new_w - w) / 2))
-    img = np.zeros((h, w, 3), dtype='f') + 122.5
+    img = np.zeros((h, w, 3), dtype='f') + 127.5
     img[delta_h:delta_h+new_h, delta_w:delta_w+new_w] = orig_img
-    img = img.transpose(2, 0, 1)[np.newaxis].astype('f') / 255.0
+    img = img.transpose(2, 0, 1)[np.newaxis] / 255.0
     return orig_img, img, (delta_h, delta_w)

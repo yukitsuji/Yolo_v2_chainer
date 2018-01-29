@@ -13,6 +13,10 @@ from chainer import cuda, optimizers, serializers
 from chainer import training
 
 import cv2
+import matplotlib as mpl
+
+mpl.rcParams['axes.xmargin'] = 0
+mpl.rcParams['axes.ymargin'] = 0
 import matplotlib.pyplot as plt
 
 subprocess.call(['sh', 'setup.sh'])
@@ -21,7 +25,8 @@ from config_utils import *
 from models.yolov2_base import *
 from utils.image_loader import load_img_like_darknet
 from utils.cython_util.nms_by_class import nms_by_class, nms_by_obj
-# from utils.cython_util.nms_by_obj import nms_by_obj
+# nms_by_obj
+from utils.postprocess import visualize_with_label, clip_bbox
 
 chainer.cuda.set_max_workspace_size(chainer.cuda.get_max_workspace_size())
 os.environ["CHAINER_TYPE_CHECK"] = "0"
@@ -35,24 +40,22 @@ yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
 
 def demo_yolov2():
     """Demo yolov2."""
-    config, img_path = parse_args()
+    config, args = parse_args()
     model = get_model(config["model"])
     devices = parse_devices(config['gpus'], config['updater']['name'])
-    #test_data = load_dataset_test(config["dataset"])
-    #test_iter = create_iterator_test(test_data,
-    #                                 config['iterator'])
     # model.to_gpu(devices['main'])
-    h, w = 608, 608
-    thresh = 0.25
-    nms_thres = 0.3
+
+    img_path = args.img_path
+    h = args.height
+    w = args.width
+    thresh = args.thresh
+    nms_thresh = args.nms_thresh
+    nms_method = nms_by_class if args.nms == 'class' else nms_by_obj
+    label_names = open(args.name, 'r').read().split('\n')[:-1]
 
     orig_img, img, delta = load_img_like_darknet(img_path, h, w)
     orig_shape = orig_img.shape[:2]
     img_shape = img.shape[2:]
-    # for batch in test_iter:
-    #     input_img = batch[0][0].transpose(1, 2, 0)
-    #     batch = chainer.dataset.concat_examples(batch, devices['main'])
-    #     pred_depth, pred_pose, pred_mask = model.inference(*batch)
     # for i in range(1):
     #     # imgs = chainer.cuda.to_gpu(np.zeros((1, 3, h, w), dtype='f'), device=devices['main']) + i
     #     imgs = np.zeros((1, 3, h, w), dtype='f') + 1.
@@ -67,9 +70,21 @@ def demo_yolov2():
     # print_timer(start, stop, sentence="Inference time")
 
     # NMS by each class
-    nms_method = nms_by_obj
+    # nms_method = nms_by_obj
     if nms_method == nms_by_class:
-        bbox_pred, prob = nms_by_class(bbox_pred, prob, nms_thres)
+        prob_shape = prob.shape
+        prob = np.broadcast_to(conf[:, None], prob_shape) * prob
+        prob = prob.transpose(1, 0)
+        sort_index = np.argsort(prob, axis=1)[:, ::-1].astype(np.int32)
+        prob = prob.transpose(1, 0)
+        sort_index = sort_index.transpose(1, 0)
+        index = nms_by_class(bbox_pred, prob, sort_index, thresh, nms_thresh)
+        print(index)
+        index = np.asarray(index, dtype='i')
+        bbox_pred = bbox_pred[index[:, 0]]
+        prob = prob[index[:, 0], index[:, 1]]
+        cls_inds = index[:, 1]
+
     elif nms_method == nms_by_obj:
         cls_inds = np.argmax(prob, axis=1)
         prob = prob[np.arange(prob.shape[0]), cls_inds]
@@ -81,8 +96,7 @@ def demo_yolov2():
         bbox_pred = bbox_pred[sort_index]
         prob = prob[sort_index]
         cls_inds = cls_inds[is_index][sort_index]
-        print(prob)
-        index = nms_by_obj(bbox_pred, prob, nms_thres)
+        index = nms_by_obj(bbox_pred, prob, nms_thresh)
         bbox_pred = bbox_pred[index]
         prob = prob[index]
         cls_inds = cls_inds[index]
@@ -99,41 +113,19 @@ def demo_yolov2():
     print(bbox_pred)
     print(prob)
     print(cls_inds)
-    coco_names = open('datasets/coco/coco_names.txt', 'r').read().split('\n')[:-1]
-    pred_cls = [coco_names[i] for i in cls_inds]
-    print(pred_cls)
+    pred_names = [label_names[i] for i in cls_inds]
+    print(pred_names)
 
     # Visualize
-    img = visualize(orig_img, bbox_pred, prob)
-    cv2.namedWindow("img", cv2.WINDOW_NORMAL)
-    cv2.imshow("img", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    index = index[:, 0] if nms_method == nms_by_class else None
+    ax = visualize_with_label(orig_img, bbox_pred, prob, pred_names,
+                              index=index)
+    if args.save:
+        ax.axis('off')
+        plt.savefig("{}.png".format(args.save),
+                    bbox_inches="tight", pad_inches=0.0)
+    plt.show()
 
-def visualize(img, bbox_pred, prob):
-    for bbox, p in zip(bbox_pred, prob):
-        left_top = (bbox[0], bbox[1])
-        right_bottom = (bbox[2], bbox[3])
-        cv2.rectangle(
-            img,
-            left_top, right_bottom,
-            (255, 0, 255),
-            3
-        )
-        # text = '%s(%2d%%)' % (result["label"], result["probs"].max()*result["conf"]*100)
-        # cv2.putText(orig_img, text, (left, top-6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    return img
-
-def clip_bbox(bbox_pred, orig_shape):
-    """Clip outside of bounding boxes.
-
-    Args:
-        bbox_pred(array): Shape is (N, 4). (left_x, top_y, right_x, bottom_y)
-        orig_shape: (H, W)
-    """
-    bbox_pred[:, ::2] = np.clip(bbox_pred[:, ::2], 0, orig_shape[1])
-    bbox_pred[:, 1::2] = np.clip(bbox_pred[:, 1::2], 0, orig_shape[0])
-    return bbox_pred
 
 def main():
     demo_yolov2()

@@ -43,6 +43,14 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('config', default='default.yml', type=str, help='configure file')
     parser.add_argument('--img_path', default='./', type=str, help='image path')
+    parser.add_argument('--width', default=608, type=int)
+    parser.add_argument('--height', default=608, type=int)
+    parser.add_argument('--thresh', default=0.25, type=float)
+    parser.add_argument('--nms_thresh', default=0.3, type=float)
+    parser.add_argument('--nms', default='class', type=str, help='the way to nms')
+    parser.add_argument('--name', default='datasets/coco/coco_names.txt',
+                         type=str, help='Class names')
+    parser.add_argument('--save', default='prediction', type=str)
     args = parser.parse_args()
     config = yaml.load(open(args.config))
 
@@ -54,7 +62,8 @@ def parse_args():
     if config["mode"] == "Test":
         chainer.global_config.train = False
         chainer.global_config.enable_backprop = False
-        return config, args.img_path
+
+        return config, args
 
     subprocess.check_call(["mkdir", "-p", config["results"]])
     shutil.copy(args.config, os.path.join(config['results'], args.config.split('/')[-1]))
