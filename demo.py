@@ -123,7 +123,7 @@ def demo_yolov2():
     if args.save:
         ax.axis('off')
         plt.savefig("{}.png".format(args.save),
-                    bbox_inches="tight", pad_inches=0.0)
+                    bbox_inches="tight", pad_inches=0.0, transparent=True)
     plt.show()
 
 

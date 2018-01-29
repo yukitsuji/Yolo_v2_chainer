@@ -8,7 +8,7 @@ model:
   module: models.yolov2_base
   name: YOLOv2_base
   pretrained_model:
-    path: weight/chainer_weight/yolov2_prior_coco_608.npz
+    path: weight/chainer/yolov2_prior_coco_608.npz
     download:
   architecture:
     n_classes: 80

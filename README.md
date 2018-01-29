@@ -6,6 +6,8 @@ See the [project webpage](https://pjreddie.com/darknet/yolo/) for more details.
 
 original code: https://github.com/pjreddie/darknet
 
+<img src="./imgs/chainer/dog.png"/>  
+
 ## Download datasets
 ```bash
 ・COCO
