@@ -23,7 +23,7 @@ def select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh):
     else:
         return [], [], [], []
 
-def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thrsh):
+def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thresh):
     cls_inds = np.argmax(prob, axis=1)
     prob = prob[np.arange(prob.shape[0]), cls_inds]
     prob = conf * prob
@@ -83,6 +83,6 @@ def clip_bbox(bbox_pred, orig_shape):
         bbox_pred(array): Shape is (N, 4). (left_x, top_y, right_x, bottom_y)
         orig_shape: (H, W)
     """
-    bbox_pred[:, ::2] = np.clip(bbox_pred[:, ::2], 0, orig_shape[1])
-    bbox_pred[:, 1::2] = np.clip(bbox_pred[:, 1::2], 0, orig_shape[0])
+    bbox_pred[:, ::2] = np.clip(bbox_pred[:, ::2], 0, orig_shape[1] - 1)
+    bbox_pred[:, 1::2] = np.clip(bbox_pred[:, 1::2], 0, orig_shape[0] - 1)
     return bbox_pred
