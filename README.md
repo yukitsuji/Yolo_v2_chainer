@@ -41,7 +41,7 @@ img_thresh = 0.001
 
 ## Model Comparison from Darknet
 | Model | Dataset | darknet map | chainer map | cfg | darknet weight | Chainer | orig fps | chainer fps |
-|:--------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
+|:--------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
 | **YOLOv2** | **VOC2007+20012** | **76.8** | **75.2** |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | | **** | **** |
 | **YOLOv2 544×544** | **VOC2007+20012** | **78.6** | **77.9** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | | | |
 | **Tiny YOLO** | **VOC2007+20012** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo-voc.weights)** | | | |
