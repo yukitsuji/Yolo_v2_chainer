@@ -1,4 +1,5 @@
-from __future__ import division
+#/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
 import subprocess
@@ -12,7 +13,6 @@ from chainer import iterators
 from chainercv.datasets import voc_bbox_label_names
 from chainercv.datasets import VOCBboxDataset
 from chainercv.evaluations import eval_detection_voc
-from chainercv.links import SSD300
 from chainercv.utils import apply_prediction_to_iterator
 
 subprocess.call(['sh', 'setup.sh'])
@@ -56,7 +56,7 @@ def main():
         model.to_gpu(args.gpu)
 
     dataset = VOCBboxDataset(
-        data_dir="../dataset/voc/VOC_test/VOC2007_test",
+        data_dir="../dataset/VOC_test/VOC2007_test",
         year='2007', split='test', use_difficult=True, return_difficult=True)
     iterator = iterators.SerialIterator(
         dataset, args.batchsize, repeat=False, shuffle=False)

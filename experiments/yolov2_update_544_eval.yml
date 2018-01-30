@@ -7,7 +7,7 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: weight/chainer/yolov2_update_voc_416.npz
+    path: weight/chainer/yolov2_update_voc_544.npz
     download: # https://0000_model.npz
   architecture:
     n_classes: 20
@@ -16,6 +16,6 @@ model:
               9.47112, 4.84053, 11.2364, 10.0071]
     thresh : 0.001
     nms_thresh: 0.5 #0.45
-    width: 416
-    height: 416
+    width: 544
+    height: 544
     nms: class

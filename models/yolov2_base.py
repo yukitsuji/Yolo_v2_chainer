@@ -181,19 +181,18 @@ class YOLOv2_base(chainer.Chain):
             _, orig_h, orig_w = img.shape
             if (orig_h / self.height) > (orig_w / self.width):
                 new_h = self.height
-                new_w = int(orig_w / (orig_h / self.height))
+                new_w = int((orig_w * self.height) / orig_h)
             else:
                 new_w = self.width
-                new_h = int(orig_h / (orig_w / self.width))
+                new_h = int((orig_h * self.width) / orig_w)
 
             img = F.resize_images(img[np.newaxis, :], (new_h, new_w)).data
             delta_h = int(abs((new_h - self.height) / 2))
             delta_w = int(abs((new_w - self.width) / 2))
-            img = img / 255.
+            img /= 255.
             input_imgs[b, :, delta_h:new_h+delta_h, delta_w:new_w+delta_w] = img
             orig_sizes[b] = [orig_h, orig_w] # TODO
             delta_sizes[b] = [delta_h, delta_w] # TODO
-            # print(" ", orig_h, orig_w, img.shape, delta_h, delta_w)
 
         input_imgs = self.xp.array(input_imgs, dtype='f')
         return input_imgs, orig_sizes, delta_sizes
@@ -245,7 +244,7 @@ class YOLOv2_base(chainer.Chain):
                     bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
                     bbox_pred[:, ::2] -= delta_size[1]
                     bbox_pred[:, 1::2] -= delta_size[0]
-                    # TODO: expand to original size
+                    # expand to original size
                     expand = orig_size[1] / self.width if orig_size[0] < orig_size[1] else orig_size[0] / self.height
                     bbox_pred *= expand
                     # Clip

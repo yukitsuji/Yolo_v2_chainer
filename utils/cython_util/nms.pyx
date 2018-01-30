@@ -98,7 +98,7 @@ def nms_by_class(np.ndarray[DTYPE_t, ndim=2] bbox_pred,
           top_y = max_float(yy1, com_yy1)
           bottom_y = min_float(yy2, com_yy2)
 
-          intersection = max_float(0, right_x - left_x) * max_float(0, bottom_y - top_y)
+          intersection = max_float(0, right_x - left_x + 1) * max_float(0, bottom_y - top_y + 1)
           union = height * width + com_height * com_width
 
           if intersection / (union - intersection) > nms_threshold:

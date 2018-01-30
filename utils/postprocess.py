@@ -30,7 +30,7 @@ def select_bbox_by_obj(bbox_pred, conf, prob, thresh, nms_thresh):
     is_index = np.where(prob >= thresh)
     bbox_pred = bbox_pred[is_index]
     prob = prob[is_index]
-    sort_index = np.argsort(prob)[::-1]
+    sort_index = np.argsort(prob)[::-1].astype(np.int32)
     bbox_pred = bbox_pred[sort_index]
     prob = prob[sort_index]
     cls_inds = cls_inds[is_index][sort_index]
