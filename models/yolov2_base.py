@@ -18,22 +18,9 @@ import chainer.links as L
 from chainer import Variable
 from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
-from utils.postprocess import clip_bbox
+from utils.postprocess import clip_bbox, xywh_to_xyxy, xyxy_to_yxyx
+from utils.timer import create_timer, print_timer
 
-def create_timer():
-    start = chainer.cuda.Event()
-    stop = chainer.cuda.Event()
-    start.synchronize()
-    start.record()
-    return start, stop
-
-def print_timer(start, stop, sentence="Time"):
-    stop.record()
-    stop.synchronize()
-    elapsed_time = chainer.cuda.cupy.cuda.get_elapsed_time(
-                           start, stop) / 1000
-    print(sentence, elapsed_time)
-    return elapsed_time
 
 def parse_dic(dic, key):
     return None if dic is None or not key in dic else dic[key]
@@ -166,8 +153,32 @@ class YOLOv2_base(chainer.Chain):
         h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
         return self.conv22(h)
 
-    def __call__(self, imgs, gt_boxes, gt_labels): # TODO
-        output = self.model(imgs)
+    def __call__(self, imgs, gt_boxes, gt_labels):
+        output = self.model(imgs).data
+        N, input_channel, input_h, input_w = imgs.shape
+        N, _, out_h, out_w = output.shape
+        shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
+        xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=2)
+        xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
+        wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
+        shape = (N, self.n_boxes, out_h, out_w)
+        x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
+        y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
+        if self.anchors.ndim != 4:
+            n_device = chainer.cuda.get_device_from_array(output)
+            if n_device.id != -1:
+                self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
+            self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
+        w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
+        h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
+        bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
+        bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * self.width
+        bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * self.height
+        bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * self.width
+        bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * self.height
+        conf = F.sigmoid(conf[:, :, 0]).data
+        prob = prob.transpose(0, 1, 3, 4, 2)
+        prob = F.softmax(prob, axis=4).data
         return total_loss
 
     def prepare(self, imgs):
@@ -237,23 +248,19 @@ class YOLOv2_base(chainer.Chain):
                         select_bbox_by_obj(bbox_pred, conf, prob,
                                            self.thresh, self.nms_thresh)
                 if len(bbox_pred):
-                    bbox_pred_yx = bbox_pred.copy()
-                    bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
-                    bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
-                    bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
-                    bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
+                    bbox_pred = xywh_to_xyxy(bbox_pred)
                     bbox_pred[:, ::2] -= delta_size[1]
                     bbox_pred[:, 1::2] -= delta_size[0]
                     # expand to original size
-                    expand = orig_size[1] / self.width if orig_size[0] < orig_size[1] else orig_size[0] / self.height
+                    if orig_size[0] < orig_size[1]:
+                        expand = orig_size[1] / self.width
+                    else:
+                        expand = orig_size[0] / self.height
                     bbox_pred *= expand
                     # Clip
                     bbox_pred = clip_bbox(bbox_pred, orig_size)
                     # convert (x, y) to (y, x)
-                    bbox_pred_yx[:, 0] = bbox_pred[:, 1]
-                    bbox_pred_yx[:, 1] = bbox_pred[:, 0]
-                    bbox_pred_yx[:, 2] = bbox_pred[:, 3]
-                    bbox_pred_yx[:, 3] = bbox_pred[:, 2]
+                    bbox_pred_yx = xyxy_to_yxyx(bbox_pred)
                 else:
                     bbox_pred_yx = [[]]
                     labels = []
