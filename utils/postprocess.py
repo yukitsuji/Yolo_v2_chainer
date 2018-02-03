@@ -86,3 +86,18 @@ def clip_bbox(bbox_pred, orig_shape):
     bbox_pred[:, ::2] = np.clip(bbox_pred[:, ::2], 0, orig_shape[1] - 1)
     bbox_pred[:, 1::2] = np.clip(bbox_pred[:, 1::2], 0, orig_shape[0] - 1)
     return bbox_pred
+
+def xywh_to_xyxy(bbox_pred):
+    bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
+    bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
+    bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
+    bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
+    return bbox_pred
+
+def xyxy_to_yxyx(bbox_pred_xy):
+    bbox_pred_yx = np.zeros_like(bbox_pred_xy)
+    bbox_pred_yx[:, 0] = bbox_pred_xy[:, 1]
+    bbox_pred_yx[:, 1] = bbox_pred_xy[:, 0]
+    bbox_pred_yx[:, 2] = bbox_pred_xy[:, 3]
+    bbox_pred_yx[:, 3] = bbox_pred_xy[:, 2]
+    return bbox_pred_yx

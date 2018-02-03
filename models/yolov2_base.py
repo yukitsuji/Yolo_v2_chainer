@@ -18,22 +18,9 @@ import chainer.links as L
 from chainer import Variable
 from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
-from utils.postprocess import clip_bbox
+from utils.postprocess import clip_bbox, xywh_to_xyxy, xyxy_to_yxyx
+from utils.timer import create_timer, print_timer
 
-def create_timer():
-    start = chainer.cuda.Event()
-    stop = chainer.cuda.Event()
-    start.synchronize()
-    start.record()
-    return start, stop
-
-def print_timer(start, stop, sentence="Time"):
-    stop.record()
-    stop.synchronize()
-    elapsed_time = chainer.cuda.cupy.cuda.get_elapsed_time(
-                           start, stop) / 1000
-    print(sentence, elapsed_time)
-    return elapsed_time
 
 def parse_dic(dic, key):
     return None if dic is None or not key in dic else dic[key]
@@ -235,7 +222,7 @@ class YOLOv2_base(chainer.Chain):
 
         # もう１つの方は、anchorとground truthを事前に比較しておき、各場所(i, j)毎に、
         # anchor boxとgroundtruth比較して、最もマッチしたものをGroundTruthとして計算する。
-        # 
+        #
 
 
         bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
@@ -312,23 +299,19 @@ class YOLOv2_base(chainer.Chain):
                         select_bbox_by_obj(bbox_pred, conf, prob,
                                            self.thresh, self.nms_thresh)
                 if len(bbox_pred):
-                    bbox_pred_yx = bbox_pred.copy()
-                    bbox_pred[:, 0] -= bbox_pred[:, 2] / 2 # left_x
-                    bbox_pred[:, 1] -= bbox_pred[:, 3] / 2 # top_y
-                    bbox_pred[:, 2] += bbox_pred[:, 0] # right_x
-                    bbox_pred[:, 3] += bbox_pred[:, 1] # bottom_y
+                    bbox_pred = xywh_to_xyxy(bbox_pred)
                     bbox_pred[:, ::2] -= delta_size[1]
                     bbox_pred[:, 1::2] -= delta_size[0]
                     # expand to original size
-                    expand = orig_size[1] / self.width if orig_size[0] < orig_size[1] else orig_size[0] / self.height
+                    if orig_size[0] < orig_size[1]:
+                        expand = orig_size[1] / self.width
+                    else:
+                        expand = orig_size[0] / self.height
                     bbox_pred *= expand
                     # Clip
                     bbox_pred = clip_bbox(bbox_pred, orig_size)
                     # convert (x, y) to (y, x)
-                    bbox_pred_yx[:, 0] = bbox_pred[:, 1]
-                    bbox_pred_yx[:, 1] = bbox_pred[:, 0]
-                    bbox_pred_yx[:, 2] = bbox_pred[:, 3]
-                    bbox_pred_yx[:, 3] = bbox_pred[:, 2]
+                    bbox_pred_yx = xyxy_to_yxyx(bbox_pred)
                 else:
                     bbox_pred_yx = [[]]
                     labels = []
