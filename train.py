@@ -11,8 +11,11 @@ import yaml
 import chainer
 from chainer import cuda, optimizers, serializers
 from chainer import training
+from chainer.datasets import TransformDataset
+from chainercv.links.model.ssd import random_distort
 
 from config_utils import *
+from datasets.transform import Transform
 
 chainer.cuda.set_max_workspace_size(1024 * 1024 * 1024)
 os.environ["CHAINER_TYPE_CHECK"] = "0"
@@ -21,11 +24,16 @@ from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
     lambda loader, node: OrderedDict(loader.construct_pairs(node)))
 
+
 def train_yolov2():
     """Training yolov2."""
     config = parse_args()
     devices = parse_devices(config['gpus'], config['updater']['name'])
     train_data, test_data = load_dataset(config["dataset"])
+
+    train_data = TransformDataset(
+        train_data, Transform(None, (416, 416), 0.5))
+
     train_iter, test_iter = create_iterator(train_data, test_data,
                                             config['iterator'], devices,
                                             config['updater']['name'])

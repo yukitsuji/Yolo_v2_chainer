@@ -63,6 +63,3 @@ img_thresh = 0.001
 - Data loader for imagenet and coco dataset.
 - Training codes for darknet 224×224, 448×448.
 - Training codes for Yolo v2.
-- Evaluation scripts for Imagenet[2012] and COCO[2014] dataset.
-- Inference scripts for Yolo v2.
-- Model converter from darknet to Chainer.

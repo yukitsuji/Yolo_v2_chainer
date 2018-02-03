@@ -1,6 +1,6 @@
-end_trigger: [200000, "iteration"] # 3200 / 16 = 200 * 150 = 30000
+end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
 results: results
-gpus: [0]
+gpus: []
 mode: Train
 seed: 1
 
@@ -8,35 +8,53 @@ model:
   module: models.yolov2_base
   name: YOLOv2_base
   pretrained_model:
-    path: # 0000_model.npz
-    download: # https://0000_model.npz
+    path:
+    download:
   architecture:
     n_classes: 20
     n_boxes: 5
-    anchors: [1.08,1.19,  3.42,4.41,  6.63,11.38,
-              9.42,5.11,  16.62,10.52]
+    anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
+              9.47112, 4.84053, 11.2364, 10.0071]
+    widthes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
     coord_scale: 1
     thresh :  .6
+    height: 416
+    width: 416
 
 dataset:
   train:
-    module: datasets.coco.coco_detection_dataset
-    name: CocoDetectionDataset
+    module: chainercv.datasets
+    name: VOCBboxDataset
     args:
-      root_dir: ../dataset/COCO
-      data_dir: train2014
-      anno_file: annotations/instances_train2014.json
+      data_dir: auto
+      year: '2012'
+      split: trainval
+      use_difficult: False
+      return_difficult: False
+
+  train2:
+    module: chainercv.datasets
+    name: VOCBboxDataset
+    args:
+      data_dir: auto
+      year: '2007'
+      split: trainval
+      use_difficult: False
+      return_difficult: False
 
   valid:
-    module: datasets.coco.coco_detection_dataset
-    name: CocoDetectionDataset
+    module: chainercv.datasets
+    name: VOCBboxDataset
     args:
-      root_dir: ../dataset/COCO
-      data_dir: val2014
-      anno_file: annotations/instances_val2014.json
+      data_dir: auto
+      year: '2007'
+      split: test
+      use_difficult: True
+      return_difficult: True
 
 updater:
   name: StandardUpdater
@@ -51,11 +69,10 @@ iterator:
   #  shared_mem: 60000000
 
 optimizer:
-  name: Adam
+  name: MomentumSGD
   args:
-    alpha: 0.0002
-    beta1: 0.9
-    beta2: 0.999
+    lr: 0.001
+    momentum: 0.9
   hook:
     WeightDecay: 0.0005
 
@@ -64,11 +81,11 @@ extension:
   #  name: Evaluator
   #  trigger: [1, 'epoch']
   snapshot:
-      trigger: [200000, "iteration"]
+      trigger: [80200, "iteration"]
   snapshot_object:
       trigger: [10000, "iteration"]
   LogReport:
-    trigger: [100, "iteration"]
+    trigger: [10, "iteration"]
   PrintReport:
     name:
       epoch
@@ -77,7 +94,15 @@ extension:
       main/pixel_loss
       main/smooth_loss
       main/exp_loss
+      lr
     trigger: [100, "iteration"]
   ProgressBar:
       update_interval: 10
+  ExponentialShift:
+    trigger: [1, 'iteration']
+    attr: 'lr'
+    rate: 0.1
+    name: 'iteration'
+    numbers: [40000, 60000]
   observe_lr:
+    trigger: [10, "iteration"]

@@ -54,6 +54,8 @@ class YOLOv2_base(chainer.Chain):
         self.nms_thresh = parse_dic(config, "nms_thresh")
         self.width = parse_dic(config, "width")
         self.height = parse_dic(config, "height")
+        self.widthes = parse_dic(config, "widthes")
+        self.heightes = parse_dic(config, "heightes")
         self.nms = parse_dic(config, 'nms')
 
         if self.anchors:
@@ -166,8 +168,81 @@ class YOLOv2_base(chainer.Chain):
         h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
         return self.conv22(h)
 
-    def __call__(self, imgs, gt_boxes, gt_labels): # TODO
-        output = self.model(imgs)
+
+    def get_region_box(self, xy, wh, x_shift, y_shift, out_h, out_w):
+        x = (xy[:, :, 0] + x_shift) / out_w
+        y = (xy[:, :, 1] + y_shift) / out_h
+        w = wh[:, :, 0] * 0.5 / out_w
+        h = wh[:, :, 1] * 0.5 / out_h
+        return x, y, w, h
+
+    def calc_best_iou(pred_x, pred_y, pred_w, pred_h, gt_boxes):
+        """
+        Args:
+            pred_x(array): Shape is (B, n_boxes, out_h, out_w)
+        """
+        left_x = pred_x - pred_w / 2.
+        right_x = pred_x + pred_w / 2.
+        left_x = self.xp.maximum(pred_x - pred_w / 2., gt_boxes[:, ])
+
+
+    def __call__(self, imgs, gt_boxes, gt_labels):
+        """
+        Args:
+            imgs(array): Shape is (B, 3, H, W)
+            gt_boxes(array): Shape is (B, Max target, 4)
+            gt_labels(array): Shape is (B, Max target)
+        """
+        output = self.model(imgs).data
+        N, input_channel, input_h, input_w = imgs.shape
+        N, _, out_h, out_w = output.shape
+        shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
+        pred_xy, pred_wh, pred_conf, pred_prob = \
+            F.split_axis(F.reshape(output, shape), (2, 4, 5,), axis=2)
+        pred_xy = F.sigmoid(xy) # shape is (N, n_boxes, 2, out_h, out_w)
+        pred_wh = F.exp(wh) # shape is (N, n_boxes, 2, out_h, out_w)
+        pred_conf = F.sigmoid(pred_conf[:, :, 0])
+        pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
+        pred_prob = F.softmax(pred_prob, axis=4)
+
+        shape = (N, self.n_boxes, out_h, out_w)
+        x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
+        y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
+        if self.anchors.ndim != 4:
+            n_device = chainer.cuda.get_device_from_array(output)
+            if n_device.id != -1:
+                self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
+            self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
+        w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
+        h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
+
+        # Compare bounding boxes between predictions and groundtruthes
+        # if the best match iou between them is over best_iou's threshold,
+        # loss is 0
+        # And if number of iteration is under assigned value,
+        # regularization of bounding box regression would be applyed.
+        pred_x, pred_y, pred_w, pred_h = \
+            self.get_region_box(self, pred_xy, pred_wh,
+                                x_shift, y_shift, w_anchor, h_anchor)
+
+        best_iou, best_iou_index = calc_best_iou(pred_x.data, pred_y.data,
+                                                 pred_w.data, pred_h.data,
+                                                 gt_boxes)
+        self.nonobject_scale * (0 - pred_conf)
+        if best_iou > self.best_iou_thresh:
+            pass
+        # Compare each groundtruth boxes
+
+        # もう１つの方は、anchorとground truthを事前に比較しておき、各場所(i, j)毎に、
+        # anchor boxとgroundtruth比較して、最もマッチしたものをGroundTruthとして計算する。
+        # 
+
+
+        bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
+        # bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
+        # bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
+        # bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * img_shape[1]
+        # bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * img_shape[0]
         return total_loss
 
     def prepare(self, imgs):

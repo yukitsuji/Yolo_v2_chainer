@@ -25,6 +25,8 @@ from chainer import iterators
 from chainer.training import extensions
 
 import chainercv
+from chainer.datasets import ConcatenatedDataset
+from chainer.training import triggers
 
 from models import yolov2_base
 # from extension_util import lr_utils
@@ -109,7 +111,8 @@ def create_extension(trainer, test_iter, model, config, devices=None):
             trainer.extend(cl(update_interval=ext['update_interval']))
         elif key == 'observe_lr':
             cl = getattr(extensions, key)
-            trainer.extend(cl())
+            trigger = parse_trigger(ext['trigger'])
+            trainer.extend(cl(), trigger=trigger)
         elif key == "PolynomialShift":
             cl = getattr(lr_utils, key)
             trigger = parse_trigger(ext['trigger'])
@@ -119,6 +122,15 @@ def create_extension(trainer, test_iter, model, config, devices=None):
             args.update({'len_dataset': len_dataset, 'batchsize': batchsize,
                          'stop_trigger': trainer.stop_trigger})
             trainer.extend(cl(**args))
+        elif key == "ExponentialShift":
+            cl = getattr(extensions, key)
+            attr = ext['attr']
+            rate = ext['rate']
+            name = ext['name']
+            numbers = [int(num) for num in ext['numbers']]
+            trainer.extend(cl(attr, rate),
+                           trigger=triggers.ManualScheduleTrigger(numbers, name))
+
     return trainer
 
 def create_updater(train_iter, optimizer, config, devices):
@@ -203,6 +215,13 @@ def load_dataset(config):
     cl = get_class(train_config['module'])
     train_loader = getattr(cl, train_config['name'])
     train_data = train_loader(**train_config['args'])
+    if parse_dict(config, 'train2', None):
+        train_config = config['train2']
+        cl = get_class(train_config['module'])
+        train_loader = getattr(cl, train_config['name'])
+        train_data2 = train_loader(**train_config['args'])
+        train_data = ConcatenatedDataset(train_data, train_data2)
+
     test_config = config['valid']
     cl = get_class(test_config['module'])
     test_loader = getattr(cl, test_config['name'])
