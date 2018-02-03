@@ -16,6 +16,7 @@ from chainercv.links.model.ssd import random_distort
 from chainercv.links.model.ssd import resize_with_random_interpolation
 
 from config_utils import parse_dict
+from utils.cython_util.nms_by_class import nms_gt_anchor
 
 
 class Transform(object):
@@ -184,5 +185,6 @@ def create_map_anchor_gt(bbox, anchor_cl, output_shape, downscale, n_boxes):
     anchors = self.anchors.copy()
     anchors[:, 0] /= shape[1]
     anchors[:, 1] /= shape[0]
-    gt_box_index = calc_best_iou(gt_bbox_w, gt_bbox_h, anchors)
-    pass
+    gt_box_index = nms_gt_anchor(gt_bbox_w, gt_bbox_h, anchors)
+    # gmap = np.concatenate()
+    return gt_bbox_index_x, gt_bbox_index_y, gt_box_index

@@ -176,35 +176,39 @@ def nms_by_obj(np.ndarray[DTYPE_t, ndim=2] bbox_pred,
 @cython.nonecheck(False)
 @cython.cdivision(True)
 @cython.profile(False)
-def nms_by_obj(np.ndarray[DTYPE_t, ndim=1] gt_w,
-               np.ndarray[DTYPE_t, ndim=1] gt_h,
-               np.ndarray[DTYPE_t, ndim=2] anchor_hw):
+def nms_gt_anchor(np.ndarray[DTYPE_t, ndim=1] gt_w,
+                  np.ndarray[DTYPE_t, ndim=1] gt_h,
+                  np.ndarray[DTYPE_t, ndim=2] anchor_hw):
 
     cdef int num_anchor = anchor_hw.shape[0]
     cdef int num_gt = gt_w.shape[0]
-    cdef np.ndarray[DTYPE_int_t, ndim=1] suppressed = np.zeros((num_gt), dtype=DTYPE_int)
+    cdef np.ndarray[DTYPE_int_t, ndim=1] results = np.zeros((num_gt), dtype=DTYPE_int)
     cdef int i, j
 
-    cdef float iou
-    cdef float best_iou
-    cdef float t_w, t_h
-    cdef inter_h, inter_w, intersect
+    cdef float iou, best_iou
+    cdef float t_w, t_h, a_h, aw, inter_h, inter_w,
+    cdef intersect, union
+    cdef int best_index
 
     for i in range(num_gt):
-      t_w = gt_w[i]
-      t_h = gt_h[i]
+        t_w = gt_w[i]
+        t_h = gt_h[i]
+        best_iou = 0
+        best_index = 0
+        for j in range(num_anchor):
+            intersection = 0
+            a_h = anchor_hw[j, 0]
+            a_w = anchor_hw[j, 1]
 
-      for j in range(num_anchor):
-        intersection = 0
-        a_h = anchor_hw[j, 0]
-        a_w = anchor_hw[j, 1]
+            inter_h = min_float(a_h, t_h)
+            inter_w = min_float(a_w, t_w)
 
-        inter_h = min_float(a_h, t_h)
-        inter_w = min_float(a_w, t_w)
+            intersect = inter_h * inter_w
+            union = t_w * t_h + a_h * a_w
+            iou = intersect / (union - intersect)
 
-        intersect = inter_h * inter_w
-        union = t_w * t_h + a_h * a_w
-
-        if intersect / (union - intersect) > threshold:
-          suppressed[j] = 1
+            if iou > best_iou:
+                best_iou = iou
+                best_index = j
+        results[i] = best_index
     return result_index

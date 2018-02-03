@@ -160,10 +160,18 @@ class YOLOv2_base(chainer.Chain):
         h = wh[:, :, 1] * 0.5 / out_h
         return x, y, w, h
 
-    def calc_iou_anchor_gt(anchors, gt_boxes):
+    def calc_all_iou(self, pred_x, pred_y, pred_w, pred_h, gt_boxes):
+        pass
+
+    def delta_region_box(self):
+
+        pass
+
+    def calc_iou_anchor_gt(self, pred_x, pred_y, pred_w, pred_h, gt_boxes, gt_conf, conf):
         """
         Args:
-            anchors(array): Shape is (n_boxes * out_h * out_w, 4)
+            pred_x(array): Shape is (B, n_boxes, out_h, out_w, 4)
+                           Shape is (n_boxes * out_h * out_w, 4)
             gt_boxes(array): Shape is (B, target, 4)
 
             B, target, n_boxes, -1: targetごとにbest IOUを取得する
@@ -173,13 +181,29 @@ class YOLOv2_base(chainer.Chain):
         Returns:
             Shape is (B * target)
         """
-        anchors = self.xp.broadcast_to(anchors[None, None, :],
-                                       (B, target, n_boxes*h*w, 4))
-        gt_boxes = self.xp.broadcast_to(gt_boxes[:, :, None, :],
-                                        (B, target, n_boxes*h*w, 4))
-        left_x = self.xp.maximum(anchors[:, ])
+        t_boxes = gt_boxes[index]
+        p_x = pred_x[index]
+        p_y = pred_y[index]
+        p_w = pred_w[index]
+        p_h = pred_h[index]
+        left_x = self.xp.maximum(p_x - p_w / 2., gt_boxes[:, 0])
+        right_x = self.xp.maximum(p_x + p_w / 2., gt_boxes[:, 1])
+        top_y = self.xp.maximum(p_y - p_h / 2., gt_boxes[:, 2])
+        bottom_y = self.xp.maximum(p_y + p_h / 2., gt_boxes[:, 3])
 
-    def calc_best_iou(pred_x, pred_y, pred_w, pred_h, gt_boxes, conf, gt_conf):
+        intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
+        union = p_w * p_h + (gt_boxes[:, 2] - gt_boxes[:, 0]) * (gt_boxes[:, 3] - gt_boxes[:, 1])
+        iou = intersect / (union - intersect)
+
+        tx[index] = gt_boxes[:, 0] * out_w - x_shift[index]
+        ty[index] = gt_boxes[:, 1] * out_h - y_shift[index]
+        tw[index] = self.xp.log(gt_boxes[:, 2] * out_w / w_anchor[index])
+        th[index] = self.xp.log(gt_boxes[:, 3] * out_h / h_anchor[index])
+        tconf[index] = iou
+        return tx, ty, tw, th
+
+
+    def calc_best_iou(self, pred_x, pred_y, pred_w, pred_h, gt_boxes, conf, gt_conf):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w)
@@ -255,6 +279,11 @@ class YOLOv2_base(chainer.Chain):
         w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
         h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
 
+        pred_x = (pred_xy[:, :, 0] + x_shift) / out_w
+        pred_y = (pred_xy[:, :, 1] + y_shift) / out_h
+        pred_w = pred_wh[:, :, 0] * w_anchor / out_w
+        pred_h = pred_wh[:, :, 1] * h_anchor / out_h
+
         # Compare bounding boxes between predictions and groundtruthes
         # if the best match iou between them is over best_iou's threshold,
         # loss is 0
@@ -275,14 +304,6 @@ class YOLOv2_base(chainer.Chain):
 
         # もう１つの方は、anchorとground truthを事前に比較しておき、各場所(i, j)毎に、
         # anchor boxとgroundtruth比較して、最もマッチしたものをGroundTruthとして計算する。
-        #
-
-
-        bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
-        # bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
-        # bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
-        # bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * img_shape[1]
-        # bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * img_shape[0]
         return total_loss
 
     def prepare(self, imgs):
