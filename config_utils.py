@@ -38,7 +38,7 @@ yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
 SEED = 0
 
 def parse_dict(dic, key, value=None):
-    return value if not key in dic else dic[key]
+    return value if dic is None or not key in dic else dic[key]
 
 def parse_args():
     parser = argparse.ArgumentParser()

@@ -20,10 +20,7 @@ from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
 from utils.postprocess import clip_bbox, xywh_to_xyxy, xyxy_to_yxyx
 from utils.timer import create_timer, print_timer
-
-
-def parse_dic(dic, key):
-    return None if dic is None or not key in dic else dic[key]
+from config_utils import parse_dict
 
 
 class YOLOv2_base(chainer.Chain):
@@ -33,17 +30,17 @@ class YOLOv2_base(chainer.Chain):
         super(YOLOv2_base, self).__init__()
         self.n_boxes = config['n_boxes']
         self.n_classes = config['n_classes']
-        self.anchors = parse_dic(config, "anchors")
-        self.object_scale = parse_dic(config, "object_scale")
-        self.nonobject_scale = parse_dic(config, "nonobject_scale")
-        self.coord_scale = parse_dic(config, "coord_scale")
-        self.thresh = parse_dic(config, "thresh")
-        self.nms_thresh = parse_dic(config, "nms_thresh")
-        self.width = parse_dic(config, "width")
-        self.height = parse_dic(config, "height")
-        self.widthes = parse_dic(config, "widthes")
-        self.heightes = parse_dic(config, "heightes")
-        self.nms = parse_dic(config, 'nms')
+        self.anchors = parse_dict(config, "anchors")
+        self.object_scale = parse_dict(config, "object_scale")
+        self.nonobject_scale = parse_dict(config, "nonobject_scale")
+        self.coord_scale = parse_dict(config, "coord_scale")
+        self.thresh = parse_dict(config, "thresh")
+        self.nms_thresh = parse_dict(config, "nms_thresh")
+        self.width = parse_dict(config, "width")
+        self.height = parse_dict(config, "height")
+        self.widthes = parse_dict(config, "widthes")
+        self.heightes = parse_dict(config, "heightes")
+        self.nms = parse_dict(config, 'nms')
 
         if self.anchors:
             self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
@@ -116,11 +113,11 @@ class YOLOv2_base(chainer.Chain):
             out_ch = self.n_boxes * (5 + self.n_classes)
             self.conv22 = L.Convolution2D(1024, out_ch, ksize=1, stride=1, pad=0)
 
-        if parse_dic(pretrained_model, 'download'):
+        if parse_dict(pretrained_model, 'download'):
             if not os.path.exists(pretrained_model['download'].split("/")[-1]):
                 subprocess.call(['wget', pretrained_model['download']])
 
-        if parse_dic(pretrained_model, 'path'):
+        if parse_dict(pretrained_model, 'path'):
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
     def model(self, x):
@@ -163,17 +160,72 @@ class YOLOv2_base(chainer.Chain):
         h = wh[:, :, 1] * 0.5 / out_h
         return x, y, w, h
 
-    def calc_best_iou(pred_x, pred_y, pred_w, pred_h, gt_boxes):
+    def calc_iou_anchor_gt(anchors, gt_boxes):
+        """
+        Args:
+            anchors(array): Shape is (n_boxes * out_h * out_w, 4)
+            gt_boxes(array): Shape is (B, target, 4)
+
+            B, target, n_boxes, -1: targetごとにbest IOUを取得する
+            B, target, -1
+            B, -1:
+
+        Returns:
+            Shape is (B * target)
+        """
+        anchors = self.xp.broadcast_to(anchors[None, None, :],
+                                       (B, target, n_boxes*h*w, 4))
+        gt_boxes = self.xp.broadcast_to(gt_boxes[:, :, None, :],
+                                        (B, target, n_boxes*h*w, 4))
+        left_x = self.xp.maximum(anchors[:, ])
+
+    def calc_best_iou(pred_x, pred_y, pred_w, pred_h, gt_boxes, conf, gt_conf):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w)
+                                    B * n_boxes*out_h*out_w, target
+            gt_boxes(array): Shape is (B, target, 4)
+                                    B * n_boxes*out_h*out_w, target, 4
+
+            B,　n_boxes, -1, target: 各boxごとにBest IOUを取る
+            self.xp.argmax(hoge, axis=target_axis)
+
+        Returns:
+            各boxごとにbest iouが求められたら、best iouがしきい値を超えているか比較する。
+            もし超えている場合、nonobject_scaleは計算する必要がない。
+            GPU実装なので、一括で計算してからmaskしたほうが良さそう。
+
+            negative: 0 - conf
+            positive: iou - conf
+            conf[iou < best_iou]
+
+            conf_loss = (gt_conf - conf) ** 2 * conf_scale
+
         """
-        left_x = pred_x - pred_w / 2.
-        right_x = pred_x + pred_w / 2.
-        left_x = self.xp.maximum(pred_x - pred_w / 2., gt_boxes[:, ])
+        gt_boxes = self.xp.repeat(gt_boxes[])
 
+        pred_left_x = pred_x - pred_w / 2.
+        pred_right_x = pred_x + pred_w / 2.
+        pred_top_y = pred_y - pred_h / 2.
+        pred_bottom_y = pred_y + pred_h / 2.
 
-    def __call__(self, imgs, gt_boxes, gt_labels):
+        left_x = self.xp.maximum(pred_left_x, gt_boxes[:, :, 0])
+        right_x = self.xp.minimum(pred_right_x, gt_boxes[:, :, 1])
+        top_y = self.xp.maximum(pred_top_y, gt_boxes[:, :, 2])
+        bottom_y = self.xp.minimum(pred_bottom_y, gt_boxes[:, :, 3])
+        intersect = self.xp.maximum(right_x - left_x, 0) * \
+                        self.xp.maximum(bottom_y - top_y, 0)
+        union = pred_w * pred_w + \
+                    (gt_boxes[:, :, 1] - gt_boxes[:, :, 0]) * (gt_boxes[:, :, 3] - gt_boxes[:, :, 2])
+        iou = intersect / (union +  1e-10)
+        best_iou_index = self.xp.argmax(iou, axis=1)
+        best_iou = iou[self.xp.arange(iou.shape[0]), best_iou_index]
+        best_iou > self.best_iou_thresh
+        gt_conf = self.xp.zeros((hoge), dtype='f')
+        conf_scale[best_iou > self.iou_thresh] = 0
+        # gt_conf[best_iou > self.iou_thresh] = conf[best_iou > self.iou_thresh]
+
+    def __call__(self, imgs, gt_boxes, gt_labels, hoge):
         """
         Args:
             imgs(array): Shape is (B, 3, H, W)
@@ -188,7 +240,7 @@ class YOLOv2_base(chainer.Chain):
             F.split_axis(F.reshape(output, shape), (2, 4, 5,), axis=2)
         pred_xy = F.sigmoid(xy) # shape is (N, n_boxes, 2, out_h, out_w)
         pred_wh = F.exp(wh) # shape is (N, n_boxes, 2, out_h, out_w)
-        pred_conf = F.sigmoid(pred_conf[:, :, 0])
+        pred_conf = F.sigmoid(pred_conf[:, :, 0]) # (N, n_boxes, out_h, out_w)
         pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
         pred_prob = F.softmax(pred_prob, axis=4)
 
@@ -212,9 +264,10 @@ class YOLOv2_base(chainer.Chain):
             self.get_region_box(self, pred_xy, pred_wh,
                                 x_shift, y_shift, w_anchor, h_anchor)
 
+        # 予想したbounding boxとgroundtruthで比較する。
         best_iou, best_iou_index = calc_best_iou(pred_x.data, pred_y.data,
                                                  pred_w.data, pred_h.data,
-                                                 gt_boxes)
+                                                 gt_boxes, conf.data, gt_conf)
         self.nonobject_scale * (0 - pred_conf)
         if best_iou > self.best_iou_thresh:
             pass
