@@ -44,8 +44,6 @@ class YOLOv2_base(chainer.Chain):
         self.dim = parse_dict(config, 'dim')
         self.width = parse_dict(config, "width")
         self.height = parse_dict(config, "height")
-        # self.widthes = parse_dict(config, "widthes")
-        # self.heightes = parse_dict(config, "heightes")
         self.nms = parse_dict(config, 'nms')
 
         if self.anchors:
@@ -158,7 +156,6 @@ class YOLOv2_base(chainer.Chain):
         h = F.leaky_relu(self.bn21(self.conv21(h)), slope=0.1)
         return self.conv22(h)
 
-
     def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
                            pred_conf, pred_prob, gt_boxes, gt_labels, gmap,
                            num_labels,
@@ -260,9 +257,6 @@ class YOLOv2_base(chainer.Chain):
             gt_boxes(array): Shape is (B, Max target, 4)
             gt_labels(array): Shape is (B, Max target)
         """
-        # print(imgs.max(), imgs.min())
-        # print(gt_boxes.max(), gt_boxes.min())
-
         output = self.model(imgs).data
         N, input_channel, input_h, input_w = imgs.shape
         N, _, out_h, out_w = output.shape

@@ -29,6 +29,7 @@ from chainer.datasets import ConcatenatedDataset
 from chainer.training import triggers
 
 from models import yolov2_base
+from chainercv.datasets import voc_bbox_label_names
 # from extension_util import lr_utils
 
 from collections import OrderedDict
@@ -79,12 +80,14 @@ def create_extension(trainer, test_iter, model, config, devices=None):
     """Create extension for training models"""
     for key, ext in config.items():
         if key == "Evaluator":
-            cl = getattr(extensions, ext['name'])
+            cl = get_class(ext['module'])
+            Evaluator = getattr(cl, config['name'])
+            trigger = parse_trigger(ext['trigger'])
             args = parse_dict(ext, 'args', {})
-            if devices:
-                args['device'] = devices['main']
+            if parse_dict(args, 'label_names', 'voc') == 'voc':
+                args['label_names'] = voc_bbox_label_names
             trainer.extend(cl(
-                test_iter, model, **args), trigger=ext['trigger'])
+                test_iter, model, **args), trigger=trigger)
         elif key == "dump_graph":
             cl = getattr(extensions, key)
             trainer.extend(cl(ext['name']))

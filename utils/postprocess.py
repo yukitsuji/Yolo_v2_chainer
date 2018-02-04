@@ -4,7 +4,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from utils.cython_util.nms_by_class import nms_by_class, nms_by_obj
+from utils.cython_util.nms import nms_by_class, nms_by_obj
 
 def select_bbox_by_class(bbox_pred, conf, prob, thresh, nms_thresh):
     prob_shape = prob.shape

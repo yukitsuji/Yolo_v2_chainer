@@ -78,9 +78,13 @@ optimizer:
     WeightDecay: 0.0005
 
 extension:
-  #Evaluator:
-  #  name: Evaluator
-  #  trigger: [1, 'epoch']
+  Evaluator:
+    module: chainercv.extensions
+    name: DetectionVOCEvaluator
+    trigger: [1, 'iteration']
+    args:
+      use_07_metric: True
+      label_names: voc
   snapshot:
       trigger: [80200, "iteration"]
   snapshot_object:

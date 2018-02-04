@@ -16,7 +16,7 @@ from chainercv.links.model.ssd import random_distort
 from chainercv.links.model.ssd import resize_with_random_interpolation
 
 from config_utils import parse_dict
-from utils.cython_util.nms_by_class import nms_gt_anchor
+from utils.cython_util.nms import nms_gt_anchor
 
 
 class Transform(object):

@@ -63,19 +63,19 @@ class custom_build_ext(build_ext):
 
 ext_modules = [
     Extension(
-        "nms_by_class",
+        "nms",
         ["nms.pyx"],
         extra_compile_args={'g++': ["-std=c++11", "-Wno-cpp", "-Wno-unused-function", "-O3"]},
         include_dirs = [numpy_include],
         language="c++",
     ),
-    Extension(
-        "nms_by_obj",
-        ["nms.pyx"],
-        extra_compile_args={'g++': ["-std=c++11", "-Wno-cpp", "-Wno-unused-function", "-O3"]},
-        include_dirs = [numpy_include],
-        language="c++",
-    ),
+    # Extension(
+    #     "nms_by_obj",
+    #     ["nms.pyx"],
+    #     extra_compile_args={'g++': ["-std=c++11", "-Wno-cpp", "-Wno-unused-function", "-O3"]},
+    #     include_dirs = [numpy_include],
+    #     language="c++",
+    # ),
 ]
 
 setup(
