@@ -52,12 +52,13 @@ class Transform(object):
         # 3. Random cropping
         # 4. Resizing with random interpolation
         # 5. Random horizontal flipping
-        if self.count % 10 == 0 and self.count % self.batchsize == 0:
+        if self.count % 2 == 0 and self.count % self.batchsize == 0 and self.count != 0:
             self.i += 1
             i = self.i % len(self.dim)
             self.output_shape = (self.dim[i], self.dim[i])
+        print(self.count, self.i, self.output_shape)
         self.count += 1
-
+        
         img, bbox, label = in_data
 
         # 1. Color augmentation

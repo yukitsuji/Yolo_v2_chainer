@@ -1,6 +1,6 @@
 end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results
-gpus: []
+results: results/debug
+gpus: [1]
 mode: Train
 seed: 1
 
@@ -15,16 +15,18 @@ model:
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [384, 512, 320, 576, 544, 448, 480, 608]
     # heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
     coord_scale: 1
     best_iou_thresh: 0.6
-    thresh :  .6
     height: 416
     width: 416
+    thresh : 0.001
+    nms_thresh: 0.5 #0.45
+    nms: class
 
 dataset:
   train:
@@ -61,18 +63,18 @@ updater:
   name: StandardUpdater
 
 iterator:
-  name: SerialIterator #MultiprocessIterator
-  train_batchsize: 64
-  test_batchsize: 4
-  # args:
-  #  n_processes: 4
-  #  n_prefetch: 1
-  #  shared_mem: 60000000
+  name: MultiprocessIterator
+  train_batchsize: 8
+  test_batchsize: 8
+  args:
+   n_processes: 4
+   n_prefetch: 1
+   shared_mem: 60000000
 
 optimizer:
   name: MomentumSGD
   args:
-    lr: 0.001
+    lr: 0.0001
     momentum: 0.9
   hook:
     WeightDecay: 0.0005
@@ -81,7 +83,7 @@ extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [1, 'iteration']
+    trigger: [1, 'epoch']
     args:
       use_07_metric: True
       label_names: voc
@@ -90,7 +92,7 @@ extension:
   snapshot_object:
       trigger: [10000, "iteration"]
   LogReport:
-    trigger: [1, "iteration"]
+    trigger: [100, "iteration"]
   PrintReport:
     name:
       epoch
@@ -100,8 +102,9 @@ extension:
       main/wh_loss
       main/conf_loss
       main/prob_loss
+      validation/main/map
       lr
-    trigger: [1, "iteration"]
+    trigger: [100, "iteration"]
   ProgressBar:
       update_interval: 1
   ExponentialShift:
@@ -111,4 +114,4 @@ extension:
     name: 'iteration'
     numbers: [40000, 60000]
   observe_lr:
-    trigger: [10, "iteration"]
+    trigger: [100, "iteration"]

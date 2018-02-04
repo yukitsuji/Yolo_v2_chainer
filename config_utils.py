@@ -81,12 +81,12 @@ def create_extension(trainer, test_iter, model, config, devices=None):
     for key, ext in config.items():
         if key == "Evaluator":
             cl = get_class(ext['module'])
-            Evaluator = getattr(cl, config['name'])
+            Evaluator = getattr(cl, ext['name'])
             trigger = parse_trigger(ext['trigger'])
             args = parse_dict(ext, 'args', {})
             if parse_dict(args, 'label_names', 'voc') == 'voc':
                 args['label_names'] = voc_bbox_label_names
-            trainer.extend(cl(
+            trainer.extend(Evaluator(
                 test_iter, model, **args), trigger=trigger)
         elif key == "dump_graph":
             cl = getattr(extensions, key)

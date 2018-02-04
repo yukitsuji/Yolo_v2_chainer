@@ -172,6 +172,7 @@ class YOLOv2_base(chainer.Chain):
             Shape is (B * target)
         """
         batchsize = int(gmap.shape[0])
+        num_labels = chainer.cuda.to_cpu(num_labels)
         batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
         target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
         label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]]], dtype='i')
@@ -348,7 +349,7 @@ class YOLOv2_base(chainer.Chain):
         input_imgs = self.xp.array(input_imgs, dtype='f')
         return input_imgs, orig_sizes, delta_sizes
 
-    def evaluation(self, imgs):
+    def predict(self, imgs):
         """Inference.
 
         Args:
