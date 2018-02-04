@@ -20,8 +20,10 @@ from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
 from utils.postprocess import clip_bbox, xywh_to_xyxy, xyxy_to_yxyx
 from utils.timer import create_timer, print_timer
-from config_utils import parse_dict
+# from config_utils import parse_dict
 
+def parse_dict(dic, key, value=None):
+    return value if dic is None or not key in dic else dic[key]
 
 class YOLOv2_base(chainer.Chain):
     """Implementation of YOLOv2(416*416).
@@ -32,14 +34,18 @@ class YOLOv2_base(chainer.Chain):
         self.n_classes = config['n_classes']
         self.anchors = parse_dict(config, "anchors")
         self.object_scale = parse_dict(config, "object_scale")
-        self.nonobject_scale = parse_dict(config, "nonobject_scale")
+        self.noobject_scale = parse_dict(config, "noobject_scale")
         self.coord_scale = parse_dict(config, "coord_scale")
+        self.class_scale = parse_dict(config, 'class_scale')
+        self.best_iou_thresh = parse_dict(config, 'best_iou_thresh')
+
         self.thresh = parse_dict(config, "thresh")
         self.nms_thresh = parse_dict(config, "nms_thresh")
+        self.dim = parse_dict(config, 'dim')
         self.width = parse_dict(config, "width")
         self.height = parse_dict(config, "height")
-        self.widthes = parse_dict(config, "widthes")
-        self.heightes = parse_dict(config, "heightes")
+        # self.widthes = parse_dict(config, "widthes")
+        # self.heightes = parse_dict(config, "heightes")
         self.nms = parse_dict(config, 'nms')
 
         if self.anchors:
@@ -153,117 +159,118 @@ class YOLOv2_base(chainer.Chain):
         return self.conv22(h)
 
 
-    def get_region_box(self, xy, wh, x_shift, y_shift, out_h, out_w):
-        x = (xy[:, :, 0] + x_shift) / out_w
-        y = (xy[:, :, 1] + y_shift) / out_h
-        w = wh[:, :, 0] * 0.5 / out_w
-        h = wh[:, :, 1] * 0.5 / out_h
-        return x, y, w, h
-
-    def calc_all_iou(self, pred_x, pred_y, pred_w, pred_h, gt_boxes):
-        pass
-
-    def delta_region_box(self):
-
-        pass
-
-    def calc_iou_anchor_gt(self, pred_x, pred_y, pred_w, pred_h, gt_boxes, gt_conf, conf):
+    def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
+                           pred_conf, pred_prob, gt_boxes, gt_labels, gmap,
+                           num_labels,
+                           x_shift, y_shift, w_anchor, h_anchor,
+                           out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                           coord_scale_array, conf_scale_array):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w, 4)
                            Shape is (n_boxes * out_h * out_w, 4)
             gt_boxes(array): Shape is (B, target, 4)
 
-            B, target, n_boxes, -1: targetごとにbest IOUを取得する
-            B, target, -1
-            B, -1:
-
         Returns:
             Shape is (B * target)
         """
-        t_boxes = gt_boxes[index]
-        p_x = pred_x[index]
-        p_y = pred_y[index]
-        p_w = pred_w[index]
-        p_h = pred_h[index]
-        left_x = self.xp.maximum(p_x - p_w / 2., gt_boxes[:, 0])
-        right_x = self.xp.maximum(p_x + p_w / 2., gt_boxes[:, 1])
-        top_y = self.xp.maximum(p_y - p_h / 2., gt_boxes[:, 2])
-        bottom_y = self.xp.maximum(p_y + p_h / 2., gt_boxes[:, 3])
+        batchsize = int(gmap.shape[0])
+        batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
+        target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
+        label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]]], dtype='i')
+
+        each_indexes = gmap[batch_index, target_index]
+        x_index = each_indexes[:, 0]
+        y_index = each_indexes[:, 1]
+        bbox_index = each_indexes[:, 2]
+
+        gt_boxes = gt_boxes[batch_index, target_index]
+        gt_boxes_w = gt_boxes[:, 3] - gt_boxes[:, 1]
+        gt_boxes_h = gt_boxes[:, 2] - gt_boxes[:, 0]
+        bp_x = bbox_pred_x[batch_index, bbox_index, y_index, x_index]
+        bp_y = bbox_pred_y[batch_index, bbox_index, y_index, x_index]
+        bp_w = bbox_pred_w[batch_index, bbox_index, y_index, x_index]
+        bp_h = bbox_pred_h[batch_index, bbox_index, y_index, x_index]
+
+        left_x = self.xp.maximum(bp_x - bp_w / 2., gt_boxes[:, 1])
+        right_x = self.xp.minimum(bp_x + bp_w / 2., gt_boxes[:, 3])
+        top_y = self.xp.maximum(bp_y - bp_h / 2., gt_boxes[:, 0])
+        bottom_y = self.xp.minimum(bp_y + bp_h / 2., gt_boxes[:, 2])
 
         intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
-        union = p_w * p_h + (gt_boxes[:, 2] - gt_boxes[:, 0]) * (gt_boxes[:, 3] - gt_boxes[:, 1])
-        iou = intersect / (union - intersect)
+        union = bp_w * bp_h + gt_boxes_w * gt_boxes_h
+        iou = intersect / (union - intersect + 1e-10)
 
-        tx[index] = gt_boxes[:, 0] * out_w - x_shift[index]
-        ty[index] = gt_boxes[:, 1] * out_h - y_shift[index]
-        tw[index] = self.xp.log(gt_boxes[:, 2] * out_w / w_anchor[index])
-        th[index] = self.xp.log(gt_boxes[:, 3] * out_h / h_anchor[index])
-        tconf[index] = iou
-        return tx, ty, tw, th
+        tx[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 1] + gt_boxes_w / 2.) * out_w - x_shift[batch_index, bbox_index, y_index, x_index]
+        ty[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 0] + gt_boxes_h / 2.) * out_h - y_shift[batch_index, bbox_index, y_index, x_index]
+        tw[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_w * out_w / w_anchor[batch_index, bbox_index, y_index, x_index])
+        th[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_h * out_h / h_anchor[batch_index, bbox_index, y_index, x_index])
+        coord_scale_array[batch_index, bbox_index, y_index, x_index] = self.coord_scale * (2 - gt_boxes_h * gt_boxes_w)
 
+        tconf[batch_index, bbox_index, y_index, x_index] = iou
+        conf_scale_array[batch_index, bbox_index, y_index, x_index] = self.object_scale
+        tprob[batch_index, bbox_index, y_index, x_index] = 0
+        tprob[batch_index, bbox_index, y_index, x_index, label_index] = 1
+        return tx, ty, tw, th, tconf, tprob
 
-    def calc_best_iou(self, pred_x, pred_y, pred_w, pred_h, gt_boxes, conf, gt_conf):
+    def calc_best_iou(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
+                      gt_boxes, coord_scale_array, conf_scale_array):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w)
-                                    B * n_boxes*out_h*out_w, target
+                                    B * n_boxes * out_h * out_w, target
             gt_boxes(array): Shape is (B, target, 4)
-                                    B * n_boxes*out_h*out_w, target, 4
-
-            B,　n_boxes, -1, target: 各boxごとにBest IOUを取る
-            self.xp.argmax(hoge, axis=target_axis)
-
-        Returns:
-            各boxごとにbest iouが求められたら、best iouがしきい値を超えているか比較する。
-            もし超えている場合、nonobject_scaleは計算する必要がない。
-            GPU実装なので、一括で計算してからmaskしたほうが良さそう。
-
-            negative: 0 - conf
-            positive: iou - conf
-            conf[iou < best_iou]
-
-            conf_loss = (gt_conf - conf) ** 2 * conf_scale
-
+                                    B * n_boxes * out_h * out_w, target, 4
         """
-        gt_boxes = self.xp.repeat(gt_boxes[])
+        B, n_boxes, out_h, out_w = bbox_pred_x.shape
+        num_target = gt_boxes.shape[1]
+        gt_boxes = self.xp.broadcast_to(gt_boxes[:, None, None, None], (B, n_boxes, out_h, out_w, num_target, 4))
 
-        pred_left_x = pred_x - pred_w / 2.
-        pred_right_x = pred_x + pred_w / 2.
-        pred_top_y = pred_y - pred_h / 2.
-        pred_bottom_y = pred_y + pred_h / 2.
+        bbox_pred_x = self.xp.broadcast_to(bbox_pred_x[:, :, :, :, None], (B, n_boxes, out_h, out_w, num_target))
+        bbox_pred_y = self.xp.broadcast_to(bbox_pred_y[:, :, :, :, None], (B, n_boxes, out_h, out_w, num_target))
+        bbox_pred_w = self.xp.broadcast_to(bbox_pred_w[:, :, :, :, None], (B, n_boxes, out_h, out_w, num_target))
+        bbox_pred_h = self.xp.broadcast_to(bbox_pred_h[:, :, :, :, None], (B, n_boxes, out_h, out_w, num_target))
 
-        left_x = self.xp.maximum(pred_left_x, gt_boxes[:, :, 0])
-        right_x = self.xp.minimum(pred_right_x, gt_boxes[:, :, 1])
-        top_y = self.xp.maximum(pred_top_y, gt_boxes[:, :, 2])
-        bottom_y = self.xp.minimum(pred_bottom_y, gt_boxes[:, :, 3])
+        pred_left_x = bbox_pred_x - bbox_pred_w / 2.
+        pred_right_x = bbox_pred_x + bbox_pred_w / 2.
+        pred_top_y = bbox_pred_y - bbox_pred_h / 2.
+        pred_bottom_y = bbox_pred_y + bbox_pred_h / 2.
+
+        left_x = self.xp.maximum(pred_left_x, gt_boxes[:, :, :, :, :, 1])
+        right_x = self.xp.minimum(pred_right_x, gt_boxes[:, :, :, :, :, 3])
+        top_y = self.xp.maximum(pred_top_y, gt_boxes[:, :, :, :, :, 0])
+        bottom_y = self.xp.minimum(pred_bottom_y, gt_boxes[:, :, :, :, :, 2])
+
         intersect = self.xp.maximum(right_x - left_x, 0) * \
                         self.xp.maximum(bottom_y - top_y, 0)
-        union = pred_w * pred_w + \
-                    (gt_boxes[:, :, 1] - gt_boxes[:, :, 0]) * (gt_boxes[:, :, 3] - gt_boxes[:, :, 2])
-        iou = intersect / (union +  1e-10)
-        best_iou_index = self.xp.argmax(iou, axis=1)
-        best_iou = iou[self.xp.arange(iou.shape[0]), best_iou_index]
-        best_iou > self.best_iou_thresh
-        gt_conf = self.xp.zeros((hoge), dtype='f')
-        conf_scale[best_iou > self.iou_thresh] = 0
-        # gt_conf[best_iou > self.iou_thresh] = conf[best_iou > self.iou_thresh]
+        union = bbox_pred_h * bbox_pred_w + \
+                    (gt_boxes[:, :, :, :, :, 2] - gt_boxes[:, :, :, :, :, 0]) * (gt_boxes[:, :, :, :, :, 3] - gt_boxes[:, :, :, :, :, 1])
+        iou = intersect / (union - intersect +  1e-10)
 
-    def __call__(self, imgs, gt_boxes, gt_labels, hoge):
+        best_iou = self.xp.max(iou, axis=4)
+        over_best_iou = (best_iou > self.best_iou_thresh)
+        conf_scale_array[:] = self.noobject_scale
+        conf_scale_array[over_best_iou] = 0
+        return coord_scale_array, conf_scale_array
+
+    def __call__(self, imgs, gt_boxes, gt_labels, gmap, num_labels):
         """
         Args:
             imgs(array): Shape is (B, 3, H, W)
             gt_boxes(array): Shape is (B, Max target, 4)
             gt_labels(array): Shape is (B, Max target)
         """
+        # print(imgs.max(), imgs.min())
+        # print(gt_boxes.max(), gt_boxes.min())
+
         output = self.model(imgs).data
         N, input_channel, input_h, input_w = imgs.shape
         N, _, out_h, out_w = output.shape
         shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
         pred_xy, pred_wh, pred_conf, pred_prob = \
             F.split_axis(F.reshape(output, shape), (2, 4, 5,), axis=2)
-        pred_xy = F.sigmoid(xy) # shape is (N, n_boxes, 2, out_h, out_w)
-        pred_wh = F.exp(wh) # shape is (N, n_boxes, 2, out_h, out_w)
+        pred_xy = F.sigmoid(pred_xy) # shape is (N, n_boxes, 2, out_h, out_w)
+        pred_wh_exp = F.exp(pred_wh) # shape is (N, n_boxes, 2, out_h, out_w)
         pred_conf = F.sigmoid(pred_conf[:, :, 0]) # (N, n_boxes, out_h, out_w)
         pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
         pred_prob = F.softmax(pred_prob, axis=4)
@@ -279,31 +286,45 @@ class YOLOv2_base(chainer.Chain):
         w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
         h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
 
-        pred_x = (pred_xy[:, :, 0] + x_shift) / out_w
-        pred_y = (pred_xy[:, :, 1] + y_shift) / out_h
-        pred_w = pred_wh[:, :, 0] * w_anchor / out_w
-        pred_h = pred_wh[:, :, 1] * h_anchor / out_h
+        bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
+        bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
+        bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / out_w
+        bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / out_h
 
-        # Compare bounding boxes between predictions and groundtruthes
-        # if the best match iou between them is over best_iou's threshold,
-        # loss is 0
-        # And if number of iteration is under assigned value,
-        # regularization of bounding box regression would be applyed.
-        pred_x, pred_y, pred_w, pred_h = \
-            self.get_region_box(self, pred_xy, pred_wh,
-                                x_shift, y_shift, w_anchor, h_anchor)
+        tx = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        ty = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        tw = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        th = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        tconf = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        tprob = pred_prob.data.copy()
 
-        # 予想したbounding boxとgroundtruthで比較する。
-        best_iou, best_iou_index = calc_best_iou(pred_x.data, pred_y.data,
-                                                 pred_w.data, pred_h.data,
-                                                 gt_boxes, conf.data, gt_conf)
-        self.nonobject_scale * (0 - pred_conf)
-        if best_iou > self.best_iou_thresh:
-            pass
-        # Compare each groundtruth boxes
+        coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+        conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
 
-        # もう１つの方は、anchorとground truthを事前に比較しておき、各場所(i, j)毎に、
-        # anchor boxとgroundtruth比較して、最もマッチしたものをGroundTruthとして計算する。
+        corrd_scale_array, conf_scale_array = \
+            self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
+                               gt_boxes, coord_scale_array, conf_scale_array)
+
+        tx, ty, tw, th, tconf, tprob = \
+            self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
+                                    bbox_pred_h, pred_conf, pred_prob,
+                                    gt_boxes, gt_labels, gmap, num_labels,
+                                    x_shift, y_shift, w_anchor, h_anchor,
+                                    out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                                    coord_scale_array, conf_scale_array)
+
+        x_loss = F.sum(((tx - pred_xy[:, :, 0]) * coord_scale_array) ** 2)
+        y_loss = F.sum(((ty - pred_xy[:, :, 1]) * coord_scale_array) ** 2)
+        w_loss = F.sum(((tw - pred_wh[:, :, 0]) * coord_scale_array) ** 2)
+        h_loss = F.sum(((th - pred_wh[:, :, 1]) * coord_scale_array) ** 2)
+        conf_loss = F.sum(((tconf - pred_conf) * conf_scale_array) ** 2)
+        prob_loss = F.sum(((tprob - pred_prob) * self.class_scale) ** 2)
+        total_loss = x_loss + y_loss + w_loss + h_loss + conf_loss + prob_loss
+        chainer.report({'total_loss': total_loss}, self)
+        chainer.report({'xy_loss': x_loss + y_loss}, self)
+        chainer.report({'wh_loss': w_loss + h_loss}, self)
+        chainer.report({'conf_loss': conf_loss}, self)
+        chainer.report({'prob_loss': prob_loss}, self)
         return total_loss
 
     def prepare(self, imgs):
@@ -327,8 +348,8 @@ class YOLOv2_base(chainer.Chain):
             delta_w = int(abs((new_w - self.width) / 2))
             img /= 255.
             input_imgs[b, :, delta_h:new_h+delta_h, delta_w:new_w+delta_w] = img
-            orig_sizes[b] = [orig_h, orig_w] # TODO
-            delta_sizes[b] = [delta_h, delta_w] # TODO
+            orig_sizes[b] = [orig_h, orig_w]
+            delta_sizes[b] = [delta_h, delta_w]
 
         input_imgs = self.xp.array(input_imgs, dtype='f')
         return input_imgs, orig_sizes, delta_sizes

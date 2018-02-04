@@ -197,8 +197,8 @@ def nms_gt_anchor(np.ndarray[DTYPE_t, ndim=1] gt_w,
         best_index = 0
         for j in range(num_anchor):
             intersection = 0
-            a_h = anchor_hw[j, 0]
-            a_w = anchor_hw[j, 1]
+            a_w = anchor_hw[j, 0]
+            a_h = anchor_hw[j, 1]
 
             inter_h = min_float(a_h, t_h)
             inter_w = min_float(a_w, t_w)
@@ -211,4 +211,4 @@ def nms_gt_anchor(np.ndarray[DTYPE_t, ndim=1] gt_w,
                 best_iou = iou
                 best_index = j
         results[i] = best_index
-    return result_index
+    return results

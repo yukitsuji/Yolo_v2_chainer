@@ -5,22 +5,23 @@ mode: Train
 seed: 1
 
 model:
-  module: models.yolov2_base
-  name: YOLOv2_base
+  module: models.yolov2_variants
+  name: YOLOv2_update_base
   pretrained_model:
-    path:
+    path: weight/chainer/yolov2_update_voc_416.npz
     download:
   architecture:
     n_classes: 20
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    widthes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
-    heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [352, 384, 416, 448, 480, 512, 544, 576, 608]
+    # heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
     coord_scale: 1
+    best_iou_thresh: 0.6
     thresh :  .6
     height: 416
     width: 416
@@ -61,7 +62,7 @@ updater:
 
 iterator:
   name: SerialIterator #MultiprocessIterator
-  train_batchsize: 4
+  train_batchsize: 64
   test_batchsize: 4
   # args:
   #  n_processes: 4
@@ -85,19 +86,20 @@ extension:
   snapshot_object:
       trigger: [10000, "iteration"]
   LogReport:
-    trigger: [10, "iteration"]
+    trigger: [1, "iteration"]
   PrintReport:
     name:
       epoch
       iteration
       main/total_loss
-      main/pixel_loss
-      main/smooth_loss
-      main/exp_loss
+      main/xy_loss
+      main/wh_loss
+      main/conf_loss
+      main/prob_loss
       lr
-    trigger: [100, "iteration"]
+    trigger: [1, "iteration"]
   ProgressBar:
-      update_interval: 10
+      update_interval: 1
   ExponentialShift:
     trigger: [1, 'iteration']
     attr: 'lr'

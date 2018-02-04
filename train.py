@@ -8,6 +8,8 @@ import subprocess
 import os
 import yaml
 
+subprocess.call(['sh', 'setup.sh'])
+
 import chainer
 from chainer import cuda, optimizers, serializers
 from chainer import training
@@ -33,7 +35,8 @@ def train_yolov2():
     train_data, test_data = load_dataset(config["dataset"])
 
     train_data = TransformDataset(
-        train_data, Transform(None, (416, 416), 0.5))
+        train_data, Transform(0.5, dim=model.dim, max_target=30,
+                              anchors=model.anchors, batchsize=config['iterator']['train_batchsize']))
 
     train_iter, test_iter = create_iterator(train_data, test_data,
                                             config['iterator'], devices,
