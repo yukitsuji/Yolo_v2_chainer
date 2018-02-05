@@ -66,6 +66,5 @@ img_thresh = 0.001
 
 
 # TODO
-- Data loader for imagenet and coco dataset.
+- Data loader for imagenet.
 - Training codes for darknet 224×224, 448×448.
-- Training codes for Yolo v2.

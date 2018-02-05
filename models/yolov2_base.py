@@ -20,10 +20,10 @@ from models.reorg_layer import reorg
 from utils.postprocess import select_bbox_by_class, select_bbox_by_obj
 from utils.postprocess import clip_bbox, xywh_to_xyxy, xyxy_to_yxyx
 from utils.timer import create_timer, print_timer
-# from config_utils import parse_dict
 
 def parse_dict(dic, key, value=None):
     return value if dic is None or not key in dic else dic[key]
+
 
 class YOLOv2_base(chainer.Chain):
     """Implementation of YOLOv2(416*416).
