@@ -117,9 +117,10 @@ class Transform(object):
         gmap = gmap[:self.max_target]
         out_bbox = out_bbox[:self.max_target]
         out_label = out_label[:self.max_target]
+        num_array = min(num_bbox, self.max_target)
 
         img = np.clip(img, 0, 1)
-        return img, out_bbox, out_label, gmap, np.array([num_bbox], dtype='i')
+        return img, out_bbox, out_label, gmap, np.array([num_array], dtype='i')
 
 def create_map_anchor_gt(bbox, anchors, output_shape, downscale, n_boxes,
                          max_target):
