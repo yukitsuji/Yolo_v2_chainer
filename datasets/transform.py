@@ -56,7 +56,7 @@ class Transform(object):
             self.i += 1
             i = self.i % len(self.dim)
             self.output_shape = (self.dim[i], self.dim[i])
-        print(self.count, self.i, self.output_shape)
+        # print(self.count, self.i, self.output_shape)
         self.count += 1
         
         img, bbox, label = in_data
@@ -103,14 +103,20 @@ class Transform(object):
         bbox[:, ::2] /= self.output_shape[0] # y
         bbox[:, 1::2] /= self.output_shape[1] # x
 
-        gmap = create_map_anchor_gt(bbox, self.anchors, self.output_shape,
-                                    self.downscale, self.n_boxes, self.max_target)
-
         num_bbox = len(bbox)
-        out_bbox = np.zeros((self.max_target, 4), dtype='f')
-        out_bbox[:num_bbox] = bbox
-        out_label = np.zeros((self.max_target), dtype='i')
+        len_max = max(num_bbox, self.max_target)
+
+        gmap = create_map_anchor_gt(bbox, self.anchors, self.output_shape,
+                                    self.downscale, self.n_boxes, len_max)
+
+        out_bbox = np.zeros((len_max, 4), dtype='f')
+        out_bbox[:num_bbox] = bbox[:num_bbox]
+        out_label = np.zeros((len_max), dtype='i')
         out_label[:num_bbox] = label
+
+        gmap = gmap[:self.max_target]
+        out_bbox = out_bbox[:self.max_target]
+        out_label = out_label[:self.max_target]
 
         img = np.clip(img, 0, 1)
         return img, out_bbox, out_label, gmap, np.array([num_bbox], dtype='i')
