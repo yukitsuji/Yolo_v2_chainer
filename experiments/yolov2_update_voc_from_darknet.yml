@@ -1,6 +1,6 @@
 end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/416
-gpus: [2]
+results: results/darknet_416
+gpus: [0]
 mode: Train
 seed: 1
 
@@ -8,15 +8,15 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: weight/chainer/yolov2_update_voc_416.npz
+    path: weight/chainer/darknet19_448.npz
     download:
   architecture:
     n_classes: 20
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [384, 512, 320, 416, 448, 480, 544]
-    # heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [384, 512, 320, 416, 448, 576, 480, 544, 352, 608]
+    # dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
@@ -27,6 +27,8 @@ model:
     thresh : 0.001
     nms_thresh: 0.5 #0.45
     nms: class
+    seen_thresh: 12800
+    regularize_box: 1
 
 dataset:
   train:
@@ -74,7 +76,7 @@ iterator:
 optimizer:
   name: MomentumSGD
   args:
-    lr: 0.0001
+    lr: 0.001
     momentum: 0.9
   hook:
     WeightDecay: 0.0005

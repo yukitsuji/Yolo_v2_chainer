@@ -304,8 +304,8 @@ class YOLOv2_base(chainer.Chain):
         if self.seen < self.seen_thresh and self.regularize_box:
             tx[:] = 0.5
             ty[:] = 0.5
-            tw[:] = 1
-            th[:] = 1
+            # tw[:] = 0
+            # th[:] = 0
             coord_scale_array[:] = 0.01
 
 

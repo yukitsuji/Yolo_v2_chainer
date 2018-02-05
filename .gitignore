@@ -16,3 +16,4 @@ build
 weight/
 *.cpp
 utils/cython_util/nms.cpp
+darknet19_448.conv.23
