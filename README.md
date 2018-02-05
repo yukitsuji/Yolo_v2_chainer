@@ -22,12 +22,18 @@ http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit
 python to_chainer_converter.py --orig /path/to/original_model --name yolo_v2_chainer
 ```
 
-## demo
+## Demo
 ```bash
 python demo.py experiments/yolov2_update_608_test.yml --img_path ./data/dog.jpg --thresh 0.20 --nms_thresh 0.3 --save dog
 nms: by class
 nms_thresh = 0.3
 img_thresh = ?
+```
+
+## Training
+```bash
+python train.py experiments/yolov2_update_voc_416.yml
+nms: by class
 ```
 
 ## Evaluation
