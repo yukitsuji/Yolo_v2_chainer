@@ -50,6 +50,10 @@ class YOLOv2_update_base(YOLOv2_base):
         if parse_dic(pretrained_model, 'path'):
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
+        if self.regularize_bn:
+            layers = list(self._children)
+            self.layer_bn_list = [layer for layer in layers if "bn" in layer]
+
     def model(self, x):
         h = F.leaky_relu(self.bn1(self.conv1(x)), slope=0.1)
         h = F.max_pooling_2d(h, ksize=2, stride=2, pad=0)

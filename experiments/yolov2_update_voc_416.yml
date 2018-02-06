@@ -1,6 +1,6 @@
 end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/416
-gpus: [2]
+results: results/416_fine
+gpus: [000000000]
 mode: Train
 seed: 1
 
@@ -107,11 +107,18 @@ extension:
     trigger: [1, "epoch"]
   ProgressBar:
       update_interval: 10
-  ExponentialShift:
-    trigger: [1, 'iteration']
-    attr: 'lr'
-    rate: 0.1
-    name: 'iteration'
-    numbers: [40000, 60000]
+  # ExponentialShift:
+  #   trigger: [1, 'iteration']
+  #   attr: 'lr'
+  #   rate: 0.1
+  #   name: 'iteration'
+  #   numbers: [40000, 60000]
+  DarknetLRScheduler:
+    args:
+      attr: 'lr'
+      rate: 0.1
+      step_trigger: [40000, 60000]
+      power: 4
+      burn_in: 1000 #1000 / 64
   observe_lr:
     trigger: [1, "epoch"]

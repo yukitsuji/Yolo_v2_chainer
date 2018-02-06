@@ -46,6 +46,7 @@ class YOLOv2_base(chainer.Chain):
         self.height = parse_dict(config, "height")
         self.nms = parse_dict(config, 'nms')
         self.regularize_box = parse_dict(config, 'regularize_box')
+        self.regularize_bn = parse_dict(config, 'regularize_bn')
         self.seen_thresh = parse_dict(config, 'seen_thresh')
         self.seen = 0
 
@@ -127,6 +128,10 @@ class YOLOv2_base(chainer.Chain):
         if parse_dict(pretrained_model, 'path'):
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
+        if self.regularize_bn:
+            layers = list(self._children)
+            self.layer_bn_list = [layer for layer in layers if "bn" in layer]
+
     def model(self, x):
         h = F.leaky_relu(self.bn1(self.conv1(x)), slope=0.1)
         h = F.max_pooling_2d(h, ksize=2, stride=2)
@@ -200,7 +205,7 @@ class YOLOv2_base(chainer.Chain):
 
         intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
         union = bp_w * bp_h + gt_boxes_w * gt_boxes_h
-        iou = intersect / (union - intersect + 1e-10)
+        iou = intersect / (union - intersect + 1e-3)
 
         tx[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 1] + gt_boxes_w / 2.) * out_w - x_shift[batch_index, bbox_index, y_index, x_index]
         ty[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 0] + gt_boxes_h / 2.) * out_h - y_shift[batch_index, bbox_index, y_index, x_index]
@@ -212,10 +217,10 @@ class YOLOv2_base(chainer.Chain):
         conf_scale_array[batch_index, bbox_index, y_index, x_index] = self.object_scale
         tprob[batch_index, bbox_index, y_index, x_index] = 0
         tprob[batch_index, bbox_index, y_index, x_index, label_index] = 1
-        return tx, ty, tw, th, tconf, tprob
+        return tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array
 
     def calc_best_iou(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
-                      gt_boxes, coord_scale_array, conf_scale_array):
+                      gt_boxes, conf_scale_array):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w)
@@ -246,14 +251,13 @@ class YOLOv2_base(chainer.Chain):
                         self.xp.maximum(bottom_y - top_y, 0)
         union = bbox_pred_h * bbox_pred_w + \
                     (gt_boxes[:, :, :, :, :, 2] - gt_boxes[:, :, :, :, :, 0]) * (gt_boxes[:, :, :, :, :, 3] - gt_boxes[:, :, :, :, :, 1])
-        iou = intersect / (union - intersect +  1e-10)
+        iou = intersect / (union - intersect +  1e-3)
 
         best_iou = self.xp.max(iou, axis=4)
         over_best_iou = (best_iou > self.best_iou_thresh)
         conf_scale_array[:] = self.noobject_scale
         conf_scale_array[over_best_iou] = 0
-
-        return coord_scale_array, conf_scale_array
+        return conf_scale_array
 
     def __call__(self, imgs, gt_boxes, gt_labels, gmap, num_labels):
         """
@@ -262,9 +266,8 @@ class YOLOv2_base(chainer.Chain):
             gt_boxes(array): Shape is (B, Max target, 4)
             gt_labels(array): Shape is (B, Max target)
         """
-        output = self.model(imgs).data
+        output = self.model(imgs)
         N, input_channel, input_h, input_w = imgs.shape
-        self.seen += N
         N, _, out_h, out_w = output.shape
         shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
         pred_xy, pred_wh, pred_conf, pred_prob = \
@@ -279,7 +282,7 @@ class YOLOv2_base(chainer.Chain):
         x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
         y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
         if self.anchors.ndim != 4:
-            n_device = chainer.cuda.get_device_from_array(output)
+            n_device = chainer.cuda.get_device_from_array(x_shift)
             if n_device.id != -1:
                 self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
             self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
@@ -301,6 +304,7 @@ class YOLOv2_base(chainer.Chain):
         coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
         conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
 
+        self.seen += N
         if self.seen < self.seen_thresh and self.regularize_box:
             tx[:] = 0.5
             ty[:] = 0.5
@@ -309,11 +313,11 @@ class YOLOv2_base(chainer.Chain):
             coord_scale_array[:] = 0.01
 
 
-        corrd_scale_array, conf_scale_array = \
+        conf_scale_array = \
             self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
-                               gt_boxes, coord_scale_array, conf_scale_array)
+                               gt_boxes, conf_scale_array)
 
-        tx, ty, tw, th, tconf, tprob = \
+        tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array = \
             self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
                                     bbox_pred_h, pred_conf, pred_prob,
                                     gt_boxes, gt_labels, gmap, num_labels,
@@ -321,13 +325,28 @@ class YOLOv2_base(chainer.Chain):
                                     out_h, out_w, tx, ty, tw, th, tconf, tprob,
                                     coord_scale_array, conf_scale_array)
 
-        x_loss = F.sum(((tx - pred_xy[:, :, 0]) * coord_scale_array) ** 2)
-        y_loss = F.sum(((ty - pred_xy[:, :, 1]) * coord_scale_array) ** 2)
-        w_loss = F.sum(((tw - pred_wh[:, :, 0]) * coord_scale_array) ** 2)
-        h_loss = F.sum(((th - pred_wh[:, :, 1]) * coord_scale_array) ** 2)
-        conf_loss = F.sum(((tconf - pred_conf) * conf_scale_array) ** 2)
-        prob_loss = F.sum(((tprob - pred_prob) * self.class_scale) ** 2)
-        total_loss = x_loss + y_loss + w_loss + h_loss + conf_loss + prob_loss
+        gamma_loss = 0
+        if self.regularize_bn: # new feature
+            for layer in self.layer_bn_list:
+                layer = getattr(self, layer)
+                gamma = layer.gamma
+                gamma_loss += F.sum(F.absolute(gamma))
+            gamma_loss *= self.regularize_bn
+
+        x_loss = F.sum((tx - pred_xy[:, :, 0]) ** 2 * coord_scale_array) / 2.
+        y_loss = F.sum((ty - pred_xy[:, :, 1]) ** 2 * coord_scale_array) / 2.
+        w_loss = F.sum((tw - pred_wh[:, :, 0]) ** 2 * coord_scale_array) / 2.
+        h_loss = F.sum((th - pred_wh[:, :, 1]) ** 2 * coord_scale_array) / 2.
+        conf_loss = F.sum((tconf - pred_conf) ** 2 * conf_scale_array)/ 2
+        prob_loss = F.sum((tprob - pred_prob) ** 2 * self.class_scale)/ 2
+        total_loss = x_loss + y_loss + w_loss + h_loss + \
+                         conf_loss + prob_loss
+
+        total_loss /= N
+
+        if not isinstance(gamma_loss, int):
+            total_loss += gamma_loss
+            chainer.report({'gamma': gamma}, self)
         chainer.report({'total_loss': total_loss}, self)
         chainer.report({'xy_loss': x_loss + y_loss}, self)
         chainer.report({'wh_loss': w_loss + h_loss}, self)

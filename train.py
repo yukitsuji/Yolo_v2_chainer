@@ -21,6 +21,7 @@ from datasets.transform import Transform
 
 chainer.cuda.set_max_workspace_size(1024 * 1024 * 1024)
 os.environ["CHAINER_TYPE_CHECK"] = "0"
+# chainer.global_config.debug = True
 
 from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,

@@ -37,7 +37,7 @@ class Reorg(function.Function):
         gy = gy.transpose(0, 2, 3, 4, 1)
         gy = gy.reshape(B, -1, out_h, out_w, 2, 2)
         gy = gy.transpose(0, 1, 2, 4, 3, 5)
-        return gy.reshape(B, -1, out_h, out_w)
+        return gy.reshape(B, -1, out_h, out_w),
 
 
 def reorg(x, **kwargs):

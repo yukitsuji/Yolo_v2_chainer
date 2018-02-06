@@ -30,7 +30,7 @@ from chainer.training import triggers
 
 from models import yolov2_base
 from chainercv.datasets import voc_bbox_label_names
-# from extension_util import lr_utils
+from utils import lr_utils
 
 from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
@@ -124,6 +124,11 @@ def create_extension(trainer, test_iter, model, config, devices=None):
             args = parse_dict(ext, 'args', {})
             args.update({'len_dataset': len_dataset, 'batchsize': batchsize,
                          'stop_trigger': trainer.stop_trigger})
+            trainer.extend(cl(**args))
+        elif key == "DarknetLRScheduler":
+            cl = getattr(lr_utils, key)
+            args = parse_dict(ext, 'args', {})
+            args['step_trigger'] = [int(num) for num in args['step_trigger']]
             trainer.extend(cl(**args))
         elif key == "ExponentialShift":
             cl = getattr(extensions, key)
