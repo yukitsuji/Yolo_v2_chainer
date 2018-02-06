@@ -16,6 +16,7 @@ def parse_args():
     parser.add_argument('--name', help="File name of chainer's model parameter")
     parser.add_argument('--n_class', default=80, type=int, help="Number of class")
     parser.add_argument('--n_box', default=5, type=int, help="Number of boxes")
+    parser.add_argument('--darknet', default=0, type=int)
     return parser.parse_args()
 
 
@@ -61,6 +62,10 @@ def to_chainer_converter():
             conv.W.data = orig_data[offset: offset + out_ch * in_ch * h * w].reshape(out_ch, in_ch, h, w)
             offset += out_ch * in_ch * h * w
             i += 1
+            if args.darknet and orig_data.shape[0] == offset:
+                print("Convert darknet from bottom to {} layer".format(i - 1))
+                print("Other layers are initialized by assigned method")
+                break
         except:
             print("Load last convolutional layer")
             conv = getattr(model, 'conv{}'.format(i))
@@ -73,6 +78,7 @@ def to_chainer_converter():
 
     save_name = "{}.npz".format(args.name)
     chainer.serializers.save_npz(save_name, model)
+    print("Complete")
 
 def main():
     to_chainer_converter()

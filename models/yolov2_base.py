@@ -45,6 +45,9 @@ class YOLOv2_base(chainer.Chain):
         self.width = parse_dict(config, "width")
         self.height = parse_dict(config, "height")
         self.nms = parse_dict(config, 'nms')
+        self.regularize_box = parse_dict(config, 'regularize_box')
+        self.seen_thresh = parse_dict(config, 'seen_thresh')
+        self.seen = 0
 
         if self.anchors:
             self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
@@ -249,6 +252,7 @@ class YOLOv2_base(chainer.Chain):
         over_best_iou = (best_iou > self.best_iou_thresh)
         conf_scale_array[:] = self.noobject_scale
         conf_scale_array[over_best_iou] = 0
+
         return coord_scale_array, conf_scale_array
 
     def __call__(self, imgs, gt_boxes, gt_labels, gmap, num_labels):
@@ -260,6 +264,7 @@ class YOLOv2_base(chainer.Chain):
         """
         output = self.model(imgs).data
         N, input_channel, input_h, input_w = imgs.shape
+        self.seen += N
         N, _, out_h, out_w = output.shape
         shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
         pred_xy, pred_wh, pred_conf, pred_prob = \
@@ -295,6 +300,14 @@ class YOLOv2_base(chainer.Chain):
 
         coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
         conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+
+        if self.seen < self.seen_thresh and self.regularize_box:
+            tx[:] = 0.5
+            ty[:] = 0.5
+            tw[:] = 1
+            th[:] = 1
+            coord_scale_array[:] = 0.01
+
 
         corrd_scale_array, conf_scale_array = \
             self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
