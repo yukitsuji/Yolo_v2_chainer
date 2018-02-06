@@ -62,7 +62,7 @@ def main():
         dataset, args.batchsize, repeat=False, shuffle=False)
 
     imgs, pred_values, gt_values = apply_prediction_to_iterator(
-        model.evaluation, iterator, hook=ProgressHook(len(dataset)))
+        model.predict, iterator, hook=ProgressHook(len(dataset)))
     # delete unused iterator explicitly
     del imgs
 

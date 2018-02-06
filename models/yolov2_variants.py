@@ -18,21 +18,7 @@ import chainer.links as L
 from chainer import Variable
 from models.yolov2_base import YOLOv2_base
 from models.reorg_layer import reorg
-
-def create_timer():
-    start = chainer.cuda.Event()
-    stop = chainer.cuda.Event()
-    start.synchronize()
-    start.record()
-    return start, stop
-
-def print_timer(start, stop, sentence="Time"):
-    stop.record()
-    stop.synchronize()
-    elapsed_time = chainer.cuda.cupy.cuda.get_elapsed_time(
-                           start, stop) / 1000
-    print(sentence, elapsed_time)
-    return elapsed_time
+from utils.timer import create_timer, print_timer
 
 def parse_dic(dic, key):
     return None if dic is None or not key in dic else dic[key]
