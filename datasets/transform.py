@@ -11,12 +11,80 @@ import yaml
 import chainer
 from chainer.datasets import TransformDataset
 from chainercv import transforms
-from chainercv.links.model.ssd import random_crop_with_bbox_constraints
+# from chainercv.links.model.ssd import random_crop_with_bbox_constraints
 from chainercv.links.model.ssd import random_distort
 from chainercv.links.model.ssd import resize_with_random_interpolation
 
 from config_utils import parse_dict
 from utils.cython_util.nms import nms_gt_anchor
+
+import random
+import six
+
+from chainercv import utils
+
+
+def random_crop_with_bbox_constraints(
+        img, bbox, min_scale=0.3, max_scale=1,
+        max_aspect_ratio=2, constraints=None,
+        max_trial=50, return_param=False):
+    if constraints is None:
+        constraints = (
+            (0.1, None),
+            (0.3, None),
+            (0.5, None),
+            (0.7, None),
+            (0.9, None),
+            (None, 1),
+        )
+
+    _, H, W = img.shape
+    params = [{
+        'constraint': None, 'y_slice': slice(0, H), 'x_slice': slice(0, W)}]
+
+    if len(bbox) == 0:
+        constraints = list()
+
+    for min_iou, max_iou in constraints:
+        if min_iou is None:
+            min_iou = 0
+        if max_iou is None:
+            max_iou = 1
+
+        for _ in six.moves.range(max_trial):
+            if min_iou == 0 and max_iou == 1:
+                # IOUを気にせず、bounding box全体を必ず含むような値を取る。
+                scale = random.uniform(0.9, max_scale)
+            else:
+                scale = random.uniform(min_scale, max_scale)
+
+            # scale = random.uniform(min_scale, max_scale)
+            aspect_ratio = random.uniform(
+                max(1 / max_aspect_ratio, scale * scale),
+                min(max_aspect_ratio, 1 / (scale * scale)))
+            crop_h = int(H * scale / np.sqrt(aspect_ratio))
+            crop_w = int(W * scale * np.sqrt(aspect_ratio))
+
+            crop_t = random.randrange(H - crop_h)
+            crop_l = random.randrange(W - crop_w)
+            crop_bb = np.array((
+                crop_t, crop_l, crop_t + crop_h, crop_l + crop_w))
+
+            iou = utils.bbox_iou(bbox, crop_bb[np.newaxis])
+            if min_iou < iou.min() and iou.max() <= max_iou:
+                params.append({
+                    'constraint': (min_iou, max_iou),
+                    'y_slice': slice(crop_t, crop_t + crop_h),
+                    'x_slice': slice(crop_l, crop_l + crop_w)})
+                break
+
+    param = random.choice(params)
+    img = img[:, param['y_slice'], param['x_slice']]
+
+    if return_param:
+        return img, param
+    else:
+        return img
 
 
 class Transform(object):
@@ -58,7 +126,7 @@ class Transform(object):
             self.output_shape = (self.dim[i], self.dim[i])
         # print(self.count, self.i, self.output_shape)
         self.count += 1
-        
+
         img, bbox, label = in_data
 
         # 1. Color augmentation
@@ -69,26 +137,35 @@ class Transform(object):
 
         # Normalize. range is [0, 1]
         img /= 255.0
+        """
+        1. 画像をそのままresize。
+           scaleは、[0.25, 2]でrandomで決定
+           縦横比は、元のh, wの長さを各々random倍して得られた比率
+           長い辺にscaleをかけて、
 
-        # 2. Random expansion: resize and translation.
-        if np.random.randint(2):
-            img, param = transforms.random_expand(
-                             img, max_ratio=2, fill=self.value,
-                             return_param=True)
+        最後に、自作expand関数を用いて代入を行う
+        """
 
-            bbox = transforms.translate_bbox(
-                bbox, y_offset=param['y_offset'], x_offset=param['x_offset'])
+        # 2. Random expansion:
+        ratio = 1
+        img, param = transforms.random_expand(
+                         img, max_ratio=4, fill=self.value,
+                         return_param=True)
 
-        # 3. Random cropping
+        bbox = transforms.translate_bbox(
+            bbox, y_offset=param['y_offset'], x_offset=param['x_offset'])
+        ratio = param['ratio']
+
+        # 3. Random cropping より正方形のoutputとなるようにする。
         img, param = random_crop_with_bbox_constraints(
-            img, bbox, return_param=True)
+            img, bbox, return_param=True, max_aspect_ratio=1.5)
 
         bbox, param = transforms.crop_bbox(
             bbox, y_slice=param['y_slice'], x_slice=param['x_slice'],
             allow_outside_center=False, return_param=True)
         label = label[param['index']]
 
-        # 4. Resizing with random interpolatation # TODO
+        # 4. Resizing with random interpolatation
         _, H, W = img.shape
         img = resize_with_random_interpolation(img, self.output_shape)
         bbox = transforms.resize_bbox(bbox, (H, W), self.output_shape)

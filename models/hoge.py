@@ -165,7 +165,7 @@ class YOLOv2_base(chainer.Chain):
         return self.conv22(h)
 
     def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
-                           gt_boxes, gt_labels, gmap,
+                           pred_conf, pred_prob, gt_boxes, gt_labels, gmap,
                            num_labels,
                            x_shift, y_shift, w_anchor, h_anchor,
                            out_h, out_w, tx, ty, tw, th, tconf, tprob,
@@ -319,7 +319,7 @@ class YOLOv2_base(chainer.Chain):
 
         tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array = \
             self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
-                                    bbox_pred_h,
+                                    bbox_pred_h, pred_conf, pred_prob,
                                     gt_boxes, gt_labels, gmap, num_labels,
                                     x_shift, y_shift, w_anchor, h_anchor,
                                     out_h, out_w, tx, ty, tw, th, tconf, tprob,
@@ -333,12 +333,12 @@ class YOLOv2_base(chainer.Chain):
                 gamma_loss += F.sum(F.absolute(gamma))
             gamma_loss *= self.regularize_bn
 
-        x_loss = F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.
-        y_loss = F.sum(((ty - pred_xy[:, :, 1]) ** 2) * coord_scale_array) / 2.
-        w_loss = F.sum(((tw - pred_wh[:, :, 0]) ** 2) * coord_scale_array) / 2.
-        h_loss = F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
-        conf_loss = F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
-        prob_loss = F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
+        x_loss = F.sum((tx - pred_xy[:, :, 0]) ** 2 * coord_scale_array) / 2.
+        y_loss = F.sum((ty - pred_xy[:, :, 1]) ** 2 * coord_scale_array) / 2.
+        w_loss = F.sum((tw - pred_wh[:, :, 0]) ** 2 * coord_scale_array) / 2.
+        h_loss = F.sum((th - pred_wh[:, :, 1]) ** 2 * coord_scale_array) / 2.
+        conf_loss = F.sum((tconf - pred_conf) ** 2 * conf_scale_array)/ 2
+        prob_loss = F.sum((tprob - pred_prob) ** 2 * self.class_scale)/ 2
         total_loss = x_loss + y_loss + w_loss + h_loss + \
                          conf_loss + prob_loss
 
