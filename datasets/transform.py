@@ -218,8 +218,16 @@ class Transform(object):
         scale = np.random.uniform(0.25, 2)
         random_expand = np.random.uniform(0.8, 1.2, 2)
         net_h, net_w = self.output_shape
-        out_h = int(net_h * scale * random_expand[0])
-        out_w = int(net_w * scale * random_expand[1])
+        out_h = net_h * scale # random_expand[0]
+        out_w = net_w * scale # random_expand[1]
+        if H > W:
+            out_w = out_h * (float(W) / H) * np.random.uniform(0.8, 1.2)
+        elif H < W:
+            out_h = out_w * (float(H) / W) * np.random.uniform(0.8, 1.2)
+
+        out_h = int(out_h)
+        out_w = int(out_w)
+
         img = resize_with_random_interpolation(img, (out_h, out_w))
         bbox = transforms.resize_bbox(bbox, (H, W), (out_h, out_w))
 
