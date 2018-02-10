@@ -184,7 +184,7 @@ class YOLOv2_base(chainer.Chain):
         batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
         target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
         label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]]], dtype='i')
-
+        num_positive = len(label_index)
         each_indexes = gmap[batch_index, target_index]
         x_index = each_indexes[:, 0]
         y_index = each_indexes[:, 1]
@@ -217,7 +217,7 @@ class YOLOv2_base(chainer.Chain):
         conf_scale_array[batch_index, bbox_index, y_index, x_index] = self.object_scale
         tprob[batch_index, bbox_index, y_index, x_index] = 0
         tprob[batch_index, bbox_index, y_index, x_index, label_index] = 1
-        return tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array
+        return tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive
 
     def calc_best_iou(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
                       gt_boxes, conf_scale_array):
@@ -317,7 +317,7 @@ class YOLOv2_base(chainer.Chain):
             self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
                                gt_boxes, conf_scale_array)
 
-        tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array = \
+        tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive = \
             self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
                                     bbox_pred_h,
                                     gt_boxes, gt_labels, gmap, num_labels,
@@ -341,8 +341,8 @@ class YOLOv2_base(chainer.Chain):
         prob_loss = F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
         total_loss = x_loss + y_loss + w_loss + h_loss + \
                          conf_loss + prob_loss
-
-        total_loss /= N
+        num_positive = max(1, num_positive)
+        total_loss /= num_positive
 
         if not isinstance(gamma_loss, int):
             total_loss += gamma_loss
