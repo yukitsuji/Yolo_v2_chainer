@@ -305,7 +305,7 @@ class YOLOv2_base(chainer.Chain):
         conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
 
         self.seen += N
-        if self.seen < self.seen_thresh and self.regularize_box:
+        if self.regularize_box and self.seen < self.seen_thresh:
             tx[:] = 0.5
             ty[:] = 0.5
             # tw[:] = 0

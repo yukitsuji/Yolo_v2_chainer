@@ -31,7 +31,6 @@ from chainer.training import triggers
 from models import yolov2_base
 from chainercv.datasets import voc_bbox_label_names
 from utils import lr_utils
-
 from collections import OrderedDict
 yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
     lambda loader, node: OrderedDict(loader.construct_pairs(node)))
