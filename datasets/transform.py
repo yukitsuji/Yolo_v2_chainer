@@ -236,17 +236,9 @@ class Transform(object):
                                  fill=self.value, return_param=True)
             bbox = transforms.translate_bbox(
                 bbox, y_offset=param['y_offset'], x_offset=param['x_offset'])
-        elif out_h > net_h and out_w > net_w:
-            img, param = crop_with_bbox_constraints(
-                             img, bbox, return_param=True,
-                             crop_height=net_h, crop_width=net_w)
-            bbox, param = transforms.crop_bbox(
-                bbox, y_slice=param['y_slice'], x_slice=param['x_slice'],
-                allow_outside_center=False, return_param=True)
-            label = label[param['index']]
         else:
-            out_h = max(out_h, net_h)
-            out_w = max(out_w, net_w)
+            out_h = net_h if net_h > out_h else int(out_h * 1.05)
+            out_w = net_w if net_w > out_w else int(out_w * 1.05)
             img, param = expand(img, out_h=out_h, out_w=out_w,
                                 fill=self.value, return_param=True)
             bbox = transforms.translate_bbox(
