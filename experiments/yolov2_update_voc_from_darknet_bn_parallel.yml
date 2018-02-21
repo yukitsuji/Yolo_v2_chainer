@@ -1,4 +1,4 @@
-end_trigger: [160800, "iteration"] # 3200 / 16 = 200 * 150 = 30000
+end_trigger: [160800, "iteration"]
 results: results
 gpus: [0, 1, 2, 3]
 mode: Train
@@ -67,7 +67,7 @@ updater:
 iterator:
   name: SerialIterator
   train_batchsize: 16
-  test_batchsize: 8
+  test_batchsize: 16
   #args:
   # n_processes: 4
   # n_prefetch: 1
@@ -83,13 +83,13 @@ optimizer:
     GradientClipping: 5.0
 
 extension:
-  #Evaluator:
-  #  module: chainercv.extensions
-  #  name: DetectionVOCEvaluator
-  #  trigger: [10, 'epoch']
-  #  args:
-  #    use_07_metric: True
-  #    label_names: voc
+  Evaluator:
+    module: chainercv.extensions
+    name: DetectionVOCEvaluator
+    trigger: [10, 'epoch']
+    args:
+      use_07_metric: True
+      label_names: voc
   snapshot:
       trigger: [80200, "iteration"]
   snapshot_object:
@@ -107,7 +107,7 @@ extension:
       main/prob_loss
       validation/main/map
       lr
-    trigger: [1, "iteration"]
+    trigger: [100, "iteration"]
   ProgressBar:
       update_interval: 10
   # ExponentialShift:
