@@ -1,6 +1,6 @@
 end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/416_fine
-gpus: [0]
+results: results
+gpus: [0, 1, 2, 3]
 mode: Train
 seed: 1
 
@@ -15,14 +15,15 @@ model:
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [384, 512, 320, 416, 448, 480, 544]
+    dim: [384, 512, 320, 416, 448, 576, 480, 544, 352, 608]
+    # heightes: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
     coord_scale: 1
     best_iou_thresh: 0.6
-    height: 416
-    width: 416
+    height: 544
+    width: 544
     thresh : 0.001
     nms_thresh: 0.5 #0.45
     nms: class
@@ -62,7 +63,7 @@ updater:
   name: StandardUpdater
 
 iterator:
-  name: MultithreadIterator #SerialIterator
+  name: MultithreadIterator #MultiprocessIterator #SerialIterator
   train_batchsize: 16
   test_batchsize: 16
   args:
@@ -106,7 +107,7 @@ extension:
       lr
     trigger: [1, "epoch"]
   ProgressBar:
-      update_interval: 10
+      update_interval: 1
   # ExponentialShift:
   #   trigger: [1, 'iteration']
   #   attr: 'lr'

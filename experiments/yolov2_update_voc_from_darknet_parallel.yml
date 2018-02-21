@@ -1,6 +1,6 @@
-end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/416_fine
-gpus: [0]
+end_trigger: [160800, "iteration"]
+results: results
+gpus: [0, 1, 2, 3]
 mode: Train
 seed: 1
 
@@ -8,14 +8,14 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: yolov2_update_voc_416.npz #weight/chainer/yolov2_update_voc_416.npz
-    download: https://www.dropbox.com/s/q2betpir1v2338k/yolov2_update_voc_416.npz
+    path: darknet19_448.npz
+    download: https://www.dropbox.com/s/zkq40xp7mo80z0e/darknet19_448.npz
   architecture:
     n_classes: 20
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [384, 512, 320, 416, 448, 480, 544]
+    dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
@@ -26,13 +26,14 @@ model:
     thresh : 0.001
     nms_thresh: 0.5 #0.45
     nms: class
+    seen_thresh: 12800
 
 dataset:
   train:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2012
       year: '2012'
       split: trainval
       use_difficult: False
@@ -42,7 +43,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: trainval
       use_difficult: False
@@ -52,14 +53,14 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: test
       use_difficult: True
       return_difficult: True
 
 updater:
-  name: StandardUpdater
+  name: MultiprocessParallelUpdater # ParallelUpdater # StandardUpdater
 
 iterator:
   name: MultithreadIterator #SerialIterator
@@ -74,16 +75,17 @@ iterator:
 optimizer:
   name: MomentumSGD
   args:
-    lr: 0.0001
+    lr: 0.001
     momentum: 0.9
   hook:
     WeightDecay: 0.0005
+    GradientClipping: 5.0
 
 extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [1, 'epoch']
+    trigger: [25, 'epoch']
     args:
       use_07_metric: True
       label_names: voc
@@ -92,7 +94,7 @@ extension:
   snapshot_object:
       trigger: [1, "epoch"]
   LogReport:
-    trigger: [1, "epoch"]
+    trigger: [100, "iteration"]
   PrintReport:
     name:
       epoch
@@ -104,7 +106,7 @@ extension:
       main/prob_loss
       validation/main/map
       lr
-    trigger: [1, "epoch"]
+    trigger: [100, "iteration"]
   ProgressBar:
       update_interval: 10
   # ExponentialShift:
@@ -117,8 +119,8 @@ extension:
     args:
       attr: 'lr'
       rate: 0.1
-      step_trigger: [40000, 60000]
+      step_trigger: [60000, 120000]
       power: 4
-      burn_in: 1000 #1000 / 64
+      burn_in: 5000 #1000 / 64
   observe_lr:
     trigger: [1, "epoch"]

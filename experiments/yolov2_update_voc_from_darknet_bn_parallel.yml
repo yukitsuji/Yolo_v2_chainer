@@ -87,7 +87,7 @@ extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [10, 'epoch']
+    trigger: [25, 'epoch']
     args:
       use_07_metric: True
       label_names: voc

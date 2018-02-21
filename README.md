@@ -48,8 +48,8 @@ img_thresh = 0.001
 ## Model Comparison from Darknet
 | Model | Dataset | darknet map | chainer map | cfg | darknet weight | Chainer | orig fps | chainer fps |
 |:--------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
-| **YOLOv2** | **VOC2007+20012** | **76.8** | **75.2** |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | | **** | **** |
-| **YOLOv2 544×544** | **VOC2007+20012** | **78.6** | **77.9** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | | | |
+| **YOLOv2** | **VOC2007+20012** | **76.8** | **75.2** |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | **[link](https://www.dropbox.com/s/q2betpir1v2338k/yolov2_update_voc_416.npz)** | **** | **** |
+| **YOLOv2 544×544** | **VOC2007+20012** | **78.6** | **77.9** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | **[link](https://www.dropbox.com/s/q2betpir1v2338k/yolov2_update_voc_416.npz)** | | |
 | **Tiny YOLO** | **VOC2007+20012** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo-voc.weights)** | | | |
 | **YOLOv2 608×608** | **COCO** | | |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.cfg)** | **[link](https://pjreddie.com/media/files/yolo.weights)** | **[link](https://www.dropbox.com/s/j9ehggm8f82h0kb/yolov2_update_coco_608.npz)** | 58.8 | 66.6 |
 | **Tiny YOLO** | **COCO** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo.weights)** | | | |

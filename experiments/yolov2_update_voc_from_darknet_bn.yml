@@ -1,5 +1,5 @@
-end_trigger: [80200, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/darknet_416_bn
+end_trigger: [160800, "iteration"]
+results: results
 gpus: [0]
 mode: Train
 seed: 1
@@ -8,15 +8,14 @@ model:
   module: models.yolov2_variants
   name: YOLOv2_update_base
   pretrained_model:
-    path: weight/chainer/darknet19_448.npz
-    download:
+    path: darknet19_448.npz
+    download: https://www.dropbox.com/s/zkq40xp7mo80z0e/darknet19_448.npz
   architecture:
     n_classes: 20
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [384, 512, 320, 416, 448, 576, 480, 544, 352, 608]
-    # dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
@@ -36,7 +35,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: 'auto'
       year: '2012'
       split: trainval
       use_difficult: False
@@ -46,7 +45,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: 'auto'
       year: '2007'
       split: trainval
       use_difficult: False
@@ -56,7 +55,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: 'auto'
       year: '2007'
       split: test
       use_difficult: True
@@ -82,12 +81,13 @@ optimizer:
     momentum: 0.9
   hook:
     WeightDecay: 0.0005
+    GradientClipping: 5.0
 
 extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [1, 'epoch']
+    trigger: [10, 'epoch']
     args:
       use_07_metric: True
       label_names: voc
@@ -96,7 +96,7 @@ extension:
   snapshot_object:
       trigger: [1, "epoch"]
   LogReport:
-    trigger: [1, "epoch"]
+    trigger: [100, "iteration"]
   PrintReport:
     name:
       epoch
@@ -106,10 +106,9 @@ extension:
       main/wh_loss
       main/conf_loss
       main/prob_loss
-      main/gamma
       validation/main/map
       lr
-    trigger: [1, "epoch"]
+    trigger: [100, "iteration"]
   ProgressBar:
       update_interval: 10
   # ExponentialShift:
@@ -122,8 +121,8 @@ extension:
     args:
       attr: 'lr'
       rate: 0.1
-      step_trigger: [40000, 60000]
+      step_trigger: [60000, 120000]
       power: 4
-      burn_in: 1000 #1000 / 64
+      burn_in: 5000 #1000 / 64
   observe_lr:
     trigger: [1, "epoch"]

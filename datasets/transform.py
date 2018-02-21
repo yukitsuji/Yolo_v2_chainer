@@ -235,8 +235,8 @@ class Transform(object):
             bbox = transforms.translate_bbox(
                 bbox, y_offset=param['y_offset'], x_offset=param['x_offset'])
         else:
-            out_h = net_h if net_h > out_h else int(2*out_h - net_h)
-            out_w = net_w if net_w > out_w else int(2*out_w - net_w)
+            out_h = net_h if net_h > out_h else int(1.2*out_h)
+            out_w = net_w if net_w > out_w else int(1.2*out_w)
             img, param = expand(img, out_h=out_h, out_w=out_w,
                                 fill=self.value, return_param=True)
             bbox = transforms.translate_bbox(
