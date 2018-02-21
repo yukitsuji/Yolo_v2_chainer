@@ -91,10 +91,8 @@ extension:
     args:
       use_07_metric: True
       label_names: voc
-  snapshot:
-      trigger: [80200, "iteration"]
   snapshot_object:
-      trigger: [1, "epoch"]
+      trigger: [25, "epoch"]
   LogReport:
     trigger: [100, "iteration"]
   PrintReport:
