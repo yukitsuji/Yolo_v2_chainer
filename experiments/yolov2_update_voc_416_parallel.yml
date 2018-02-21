@@ -32,7 +32,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2012
       year: '2012'
       split: trainval
       use_difficult: False
@@ -42,7 +42,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: trainval
       use_difficult: False
@@ -52,7 +52,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: auto
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: test
       use_difficult: True
@@ -83,7 +83,7 @@ extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [1, 'epoch']
+    trigger: [5, 'epoch']
     args:
       use_07_metric: True
       label_names: voc
