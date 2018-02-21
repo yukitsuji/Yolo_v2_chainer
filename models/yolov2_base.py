@@ -278,80 +278,83 @@ class YOLOv2_base(chainer.Chain):
         pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
         pred_prob = F.softmax(pred_prob, axis=4)
 
-        shape = (N, self.n_boxes, out_h, out_w)
-        x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
-        y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
-        if self.anchors.ndim != 4:
-            n_device = chainer.cuda.get_device_from_array(x_shift)
-            if n_device.id != -1:
-                self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
-            self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
-        w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
-        h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
+        with self.xp.cuda.Device(chainer.cuda.get_device_from_array(pred_xy.data)):
+            shape = (N, self.n_boxes, out_h, out_w)
+            x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
+            y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
+            if self.anchors.ndim != 4:
+                #n_device = chainer.cuda.get_device_from_array(x_shift)
+                #if n_device.id != -1:
+                self.anchors = self.xp.array(self.anchors, dtype='f')
+                # self.anchors = chainer.cuda.to_gpu(self.anchors)#, device=n_device)
+                self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
+            w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
+            h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
 
-        bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
-        bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
-        bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / out_w
-        bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / out_h
+            print(chainer.cuda.Device().id, chainer.cuda.get_device_from_array(x_shift), chainer.cuda.get_device_from_array(pred_xy))
+            bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
+            bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
+            bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / out_w
+            bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / out_h
 
-        tx = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        ty = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        tw = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        th = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        tconf = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        tprob = pred_prob.data.copy()
+            tx = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            ty = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            tw = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            th = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            tconf = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            tprob = pred_prob.data.copy()
 
-        coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-        conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+            conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
 
-        self.seen += N
-        if self.regularize_box and self.seen < self.seen_thresh:
-            tx[:] = 0.5
-            ty[:] = 0.5
-            # tw[:] = 0
-            # th[:] = 0
-            coord_scale_array[:] = 0.01
+            self.seen += N
+            if self.regularize_box and self.seen < self.seen_thresh:
+                tx[:] = 0.5
+                ty[:] = 0.5
+                # tw[:] = 0
+                # th[:] = 0
+                coord_scale_array[:] = 0.01
 
 
-        conf_scale_array = \
-            self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
-                               gt_boxes, conf_scale_array)
+            conf_scale_array = \
+                self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
+                                   gt_boxes, conf_scale_array)
 
-        tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive = \
-            self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
-                                    bbox_pred_h,
-                                    gt_boxes, gt_labels, gmap, num_labels,
-                                    x_shift, y_shift, w_anchor, h_anchor,
-                                    out_h, out_w, tx, ty, tw, th, tconf, tprob,
-                                    coord_scale_array, conf_scale_array)
+            tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive = \
+                self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
+                                        bbox_pred_h,
+                                        gt_boxes, gt_labels, gmap, num_labels,
+                                        x_shift, y_shift, w_anchor, h_anchor,
+                                        out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                                        coord_scale_array, conf_scale_array)
 
-        gamma_loss = 0
-        if self.regularize_bn: # new feature
-            for layer in self.layer_bn_list:
-                layer = getattr(self, layer)
-                gamma = layer.gamma
-                gamma_loss += F.sum(F.absolute(gamma))
-            gamma_loss *= self.regularize_bn
+            gamma_loss = 0
+            if self.regularize_bn: # new feature
+                for layer in self.layer_bn_list:
+                    layer = getattr(self, layer)
+                    gamma = layer.gamma
+                    gamma_loss += F.sum(F.absolute(gamma))
+                gamma_loss *= self.regularize_bn
 
-        x_loss = F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.
-        y_loss = F.sum(((ty - pred_xy[:, :, 1]) ** 2) * coord_scale_array) / 2.
-        w_loss = F.sum(((tw - pred_wh[:, :, 0]) ** 2) * coord_scale_array) / 2.
-        h_loss = F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
-        conf_loss = F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
-        prob_loss = F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
-        total_loss = x_loss + y_loss + w_loss + h_loss + \
-                         conf_loss + prob_loss
-        num_positive = max(1, num_positive)
-        total_loss /= num_positive
+            x_loss = F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.
+            y_loss = F.sum(((ty - pred_xy[:, :, 1]) ** 2) * coord_scale_array) / 2.
+            w_loss = F.sum(((tw - pred_wh[:, :, 0]) ** 2) * coord_scale_array) / 2.
+            h_loss = F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
+            conf_loss = F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
+            prob_loss = F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
+            total_loss = x_loss + y_loss + w_loss + h_loss + \
+                             conf_loss + prob_loss
+            num_positive = max(1, num_positive)
+            total_loss /= num_positive
 
-        if not isinstance(gamma_loss, int):
-            total_loss += gamma_loss
-            chainer.report({'gamma': gamma}, self)
-        chainer.report({'total_loss': total_loss}, self)
-        chainer.report({'xy_loss': x_loss + y_loss}, self)
-        chainer.report({'wh_loss': w_loss + h_loss}, self)
-        chainer.report({'conf_loss': conf_loss}, self)
-        chainer.report({'prob_loss': prob_loss}, self)
+            if not isinstance(gamma_loss, int):
+                total_loss += gamma_loss
+                chainer.report({'gamma': gamma}, self)
+            chainer.report({'total_loss': total_loss}, self)
+            chainer.report({'xy_loss': x_loss + y_loss}, self)
+            chainer.report({'wh_loss': w_loss + h_loss}, self)
+            chainer.report({'conf_loss': conf_loss}, self)
+            chainer.report({'prob_loss': prob_loss}, self)
         return total_loss
 
     def prepare(self, imgs):

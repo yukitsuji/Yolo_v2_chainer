@@ -35,7 +35,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2012
       year: '2012'
       split: trainval
       use_difficult: False
@@ -45,7 +45,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: trainval
       use_difficult: False
@@ -55,7 +55,7 @@ dataset:
     module: chainercv.datasets
     name: VOCBboxDataset
     args:
-      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
       year: '2007'
       split: test
       use_difficult: True
@@ -65,7 +65,7 @@ updater:
   name: MultiprocessParallelUpdater # ParallelUpdater # StandardUpdater
 
 iterator:
-  name: SerialIterator # MultiprocessIterator
+  name: MultiprocessIterator
   train_batchsize: 16
   test_batchsize: 8
   #args:
@@ -83,13 +83,13 @@ optimizer:
     GradientClipping: 5.0
 
 extension:
-  Evaluator:
-    module: chainercv.extensions
-    name: DetectionVOCEvaluator
-    trigger: [10, 'epoch']
-    args:
-      use_07_metric: True
-      label_names: voc
+  #Evaluator:
+  #  module: chainercv.extensions
+  #  name: DetectionVOCEvaluator
+  #  trigger: [10, 'epoch']
+  #  args:
+  #    use_07_metric: True
+  #    label_names: voc
   snapshot:
       trigger: [80200, "iteration"]
   snapshot_object:
