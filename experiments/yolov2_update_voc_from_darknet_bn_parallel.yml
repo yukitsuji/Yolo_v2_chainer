@@ -1,6 +1,6 @@
 end_trigger: [160800, "iteration"] # 3200 / 16 = 200 * 150 = 30000
-results: results/darknet_416_final_bn_para
-gpus: [0, 1, 2]
+results: results
+gpus: [0, 1, 2, 3]
 mode: Train
 seed: 1
 
@@ -15,8 +15,7 @@ model:
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [384, 512, 416, 448, 480, 544, 352]
-    # dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
@@ -63,11 +62,11 @@ dataset:
       return_difficult: True
 
 updater:
-  name: ParallelUpdater # StandardUpdater
+  name: MultiprocessParallelUpdater # ParallelUpdater # StandardUpdater
 
 iterator:
   name: SerialIterator # MultiprocessIterator
-  train_batchsize: 18
+  train_batchsize: 8
   test_batchsize: 8
   #args:
   # n_processes: 4

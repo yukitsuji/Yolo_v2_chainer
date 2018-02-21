@@ -29,11 +29,9 @@ def crop_with_bbox_constraints(
     if constraints is None:
         constraints = (
             (0.1, None),
-            (0.3, None),
+            (None, 1),
             (0.5, None),
             (0.7, None),
-            (0.9, None),
-            (None, 1),
         )
 
     _, H, W = img.shape
@@ -237,8 +235,8 @@ class Transform(object):
             bbox = transforms.translate_bbox(
                 bbox, y_offset=param['y_offset'], x_offset=param['x_offset'])
         else:
-            out_h = net_h if net_h > out_h else int(out_h * 1.05)
-            out_w = net_w if net_w > out_w else int(out_w * 1.05)
+            out_h = net_h if net_h > out_h else int(2*out_h - net_h)
+            out_w = net_w if net_w > out_w else int(2*out_w - net_w)
             img, param = expand(img, out_h=out_h, out_w=out_w,
                                 fill=self.value, return_param=True)
             bbox = transforms.translate_bbox(
