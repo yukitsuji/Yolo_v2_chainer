@@ -283,15 +283,11 @@ class YOLOv2_base(chainer.Chain):
             x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
             y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
             if self.anchors.ndim != 4:
-                #n_device = chainer.cuda.get_device_from_array(x_shift)
-                #if n_device.id != -1:
                 self.anchors = self.xp.array(self.anchors, dtype='f')
-                # self.anchors = chainer.cuda.to_gpu(self.anchors)#, device=n_device)
                 self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
             w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
             h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
 
-            print(chainer.cuda.Device().id, chainer.cuda.get_device_from_array(x_shift), chainer.cuda.get_device_from_array(pred_xy))
             bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
             bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
             bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / out_w
@@ -311,10 +307,7 @@ class YOLOv2_base(chainer.Chain):
             if self.regularize_box and self.seen < self.seen_thresh:
                 tx[:] = 0.5
                 ty[:] = 0.5
-                # tw[:] = 0
-                # th[:] = 0
                 coord_scale_array[:] = 0.01
-
 
             conf_scale_array = \
                 self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,

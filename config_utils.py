@@ -60,7 +60,8 @@ def parse_args():
     SEED = parse_dict(config, "seed", 8964)
     np.random.seed(SEED)
     if cp:
-        cp.random.seed(SEED)
+        pass
+        # cp.random.seed(SEED)
 
     if config["mode"] == "Test":
         chainer.global_config.train = False
@@ -175,9 +176,7 @@ def create_iterator(train_data, test_data, config, devices, updater_name):
     args = parse_dict(config, 'args', {})
     if 'MultiprocessParallelUpdater' in updater_name:
         train_iter = [
-            chainer.iterators.MultiprocessIterator(i,
-                                                   config['train_batchsize'],
-                                                   **args)
+            Iterator(i, config['train_batchsize'], **args)
             for i in chainer.datasets.split_dataset_n_random(train_data, len(devices))]
     else:
         train_iter = Iterator(train_data, config['train_batchsize'], **args)
