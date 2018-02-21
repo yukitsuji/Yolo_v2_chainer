@@ -63,13 +63,14 @@ updater:
   name: StandardUpdater
 
 iterator:
-  name: SerialIterator # MultiprocessIterator
-  train_batchsize: 8
-  test_batchsize: 8
-  #args:
-  # n_processes: 4
-  # n_prefetch: 1
-  # shared_mem: 60000000
+  name: MultithreadIterator #MultiprocessIterator #SerialIterator
+  train_batchsize: 16
+  test_batchsize: 16
+  args:
+   n_threads: 4
+   # n_processes: 4
+   # n_prefetch: 1
+   # shared_mem: 60000000
 
 optimizer:
   name: MomentumSGD

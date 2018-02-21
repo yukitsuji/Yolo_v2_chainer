@@ -194,7 +194,7 @@ class Transform(object):
         # 3. Random cropping
         # 4. Resizing with random interpolation
         # 5. Random horizontal flipping
-        if self.count % 2 == 0 and self.count % self.batchsize == 0 and self.count != 0:
+        if self.count % 10 == 0 and self.count % self.batchsize == 0 and self.count != 0:
             self.i += 1
             i = self.i % len(self.dim)
             self.output_shape = (self.dim[i], self.dim[i])
