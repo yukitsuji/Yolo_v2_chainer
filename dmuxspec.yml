@@ -1,4 +1,4 @@
-version: 1
+version: 0
 os: ubuntu==16.04
 features:
 - cuda==8.0
