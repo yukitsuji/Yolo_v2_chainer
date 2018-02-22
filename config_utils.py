@@ -98,7 +98,12 @@ def create_extension(trainer, test_iter, model, config, devices=None):
         elif key == 'snapshot_object':
             cl = getattr(extensions, key)
             trigger = parse_trigger(ext['trigger'])
-            trainer.extend(cl(model, 'voxelnet_{.updater.iteration}'),
+            args = parse_dict(ext, 'args', {})
+            if args:
+                if args['method'] == 'best':
+                    trigger = triggers.MaxValueTrigger(
+                                  args['name'], trigger)
+            trainer.extend(cl(model, 'yolov2_{.updater.iteration}'),
                            trigger=trigger)
         elif key == 'LogReport':
             cl = getattr(extensions, key)

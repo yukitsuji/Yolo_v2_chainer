@@ -90,6 +90,9 @@ extension:
       label_names: voc
   snapshot_object:
       trigger: [5, "epoch"]
+      args:
+        method: best
+        name: validation/main/map
   LogReport:
     trigger: [1, "epoch"]
   PrintReport:
