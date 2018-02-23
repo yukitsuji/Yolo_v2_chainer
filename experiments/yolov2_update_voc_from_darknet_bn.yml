@@ -15,7 +15,8 @@ model:
     n_boxes: 5
     anchors: [1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892,
               9.47112, 4.84053, 11.2364, 10.0071]
-    dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    dim: [384, 512, 416, 448, 480, 544, 352]
+    # dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
     object_scale: 5
     noobject_scale: 1
     class_scale: 1
@@ -66,10 +67,10 @@ updater:
 
 iterator:
   name: MultithreadIterator #MultiprocessIterator #SerialIterator
-  train_batchsize: 16
+  train_batchsize: 24
   test_batchsize: 16
   args:
-   n_threads: 4
+   n_threads: 16
    # n_processes: 4
    # n_prefetch: 1
    # shared_mem: 60000000
@@ -87,14 +88,15 @@ extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [10, 'epoch']
+    trigger: [15, 'epoch']
     args:
       use_07_metric: True
       label_names: voc
-  snapshot:
-      trigger: [80200, "iteration"]
   snapshot_object:
-      trigger: [1, "epoch"]
+      trigger: [15, "epoch"]
+      args:
+        method: best
+        name: validation/main/map
   LogReport:
     trigger: [100, "iteration"]
   PrintReport:
