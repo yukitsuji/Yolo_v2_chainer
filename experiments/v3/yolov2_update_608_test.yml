@@ -1,0 +1,44 @@
+end_trigger: [200000, "iteration"] # 3200 / 16 = 200 * 150 = 30000
+results: results
+gpus: []
+mode: Test
+seed: 1
+
+model:
+  module: models.yolov3_base
+  name: YOLOv3_base
+  pretrained_model:
+    path: weight/chainer/yolov2_update_coco_608.npz
+    download: # https://0000_model.npz
+  architecture:
+    n_classes: 80
+    n_boxes: [90, 116, 198, 156, 326, 373, 61, 30, 45, 62, 119, 59,
+              13, 10, 30, 16, 23, 33]
+    # anchors: [0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434,
+    #           7.88282, 3.52778, 9.77052, 9.16828]
+    object_scale: 5
+    noobject_scale: 1
+    class_scale: 1
+    coord_scale: 1
+    thresh :  .6
+
+dataset:
+  test:
+    module: datasets.coco.coco_detection_dataset
+    name: CocoDetectionDataset
+    args:
+      root_dir: ../dataset/COCO
+      data_dir: val2014
+      anno_file: annotations/instances_val2014.json
+
+updater:
+  name: StandardUpdater
+
+iterator:
+  name: SerialIterator #MultiprocessIterator
+  train_batchsize: 1
+  test_batchsize: 1
+  # args:
+  #  n_processes: 4
+  #  n_prefetch: 1
+  #  shared_mem: 60000000

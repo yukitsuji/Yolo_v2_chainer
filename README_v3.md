@@ -1,0 +1,74 @@
+# Yolo_v3_chainer
+Yolo v3 implementation by Chainer
+
+各Scale毎に3つのanchorが揃えられている。
+
+
+
+YOLO9000: Better, Faster, Stronger [link](https://pjreddie.com/media/files/papers/YOLO9000.pdf)  
+See the [project webpage](https://pjreddie.com/darknet/yolo/) for more details.
+
+original code: https://github.com/pjreddie/darknet
+
+<img src="./imgs/chainer/dog.png"/>  
+
+## Download datasets
+```bash
+・COCO
+http://cocodataset.org/#download
+
+・VOC
+http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit
+```
+
+## Converter from darknet to chainer
+```bash
+python to_chainer_converter.py --orig /path/to/original_model --name yolo_v3_chainer
+```
+
+## Demo
+```bash
+python demo.py experiments/yolov3_update_608_test.yml --img_path ./data/dog.jpg --thresh 0.20 --nms_thresh 0.3 --save dog
+nms: by class
+nms_thresh = 0.3
+img_thresh = ?
+```
+
+## Training
+```bash
+python train.py experiments/yolov3_update_voc_416.yml
+nms: by class
+```
+
+## Evaluation
+```bash
+python evaluate.py experiments/yolov3_update_416_eval.yml --batchsize 32 --gpu 0
+# fps of evaluation includes the time of loading images.
+nms: by class
+nms_thresh = 0.5
+img_thresh = 0.001
+```
+
+## Model Comparison from Darknet
+| Model | Dataset | darknet map | chainer map | cfg | darknet weight | Chainer | orig fps | chainer fps |
+|:--------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|:---------------:|
+| **YOLOv3** | **VOC2007+20012** | **76.8** | **75.2** |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | **[link](https://www.dropbox.com/s/q2betpir1v3338k/yolov3_update_voc_416.npz)** | **** | **** |
+| **YOLOv3 544×544** | **VOC2007+20012** | **78.6** | **77.9** | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/yolo-voc.weights)** | **[link](https://www.dropbox.com/s/q2betpir1v3338k/yolov3_update_voc_416.npz)** | | |
+| **Tiny YOLO** | **VOC2007+20012** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo-voc.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo-voc.weights)** | | | |
+| **YOLOv3 608×608** | **COCO** | | |  **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.cfg)** | **[link](https://pjreddie.com/media/files/yolo.weights)** | **[link](https://www.dropbox.com/s/j9ehggm8f82h0kb/yolov3_update_coco_608.npz)** | 58.8 | 66.6 |
+| **Tiny YOLO** | **COCO** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/tiny-yolo.cfg)** | **[link](https://pjreddie.com/media/files/tiny-yolo.weights)** | | | |
+| **prior version(YOLOv3)** | **COCO** | | | **[link](https://github.com/pjreddie/darknet/blob/master/cfg/yolo.2.0.cfg)** | **[link](https://drive.google.com/open?id=0B4kMaWAXZNSWcUJCVW1aOHV0MkU)** | **[link](https://www.dropbox.com/s/vff05c4gb6dojft/yolov3_prior_coco_608.npz)**|  |  | |
+
+<!-- ## Darknetを読んで
+- GroundTruthは、一枚ごとに30個以内（インスタンス）と仮定している。
+- loss関数の計算方法
+- まず、各pixel, anchor毎に、GroundTruthとIOU Matchingを行う。 もしmax iouが閾値を超えている場合、
+  その領域の誤差を0とする。もし閾値を超えていなければ、noobject_scale * (0 - l.output[index])
+  また、少ないbatch数(12800まで)のときには、すべての領域に関して、x, y, w, hの誤差を計算する。scaleは0.01
+- GroundTruthの(x, y, w, h)の値は、(x / img_w, y / img_h, exp(w * (anchor_w / img_w)))
+- Anchorの値の意味： -->
+
+
+# TODO
+- Data loader for imagenet.
+- Training codes for darknet 224×224, 448×448.
