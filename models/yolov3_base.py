@@ -36,6 +36,7 @@ class YOLOv3_base(chainer.Chain):
         self.n_boxes = config['n_boxes']
         self.n_classes = config['n_classes']
         self.anchors = parse_dict(config, "anchors")
+        self.grid_scale = parse_dict(config, 'grid_scale')
         self.object_scale = parse_dict(config, "object_scale")
         self.noobject_scale = parse_dict(config, "noobject_scale")
         self.coord_scale = parse_dict(config, "coord_scale")
@@ -52,10 +53,14 @@ class YOLOv3_base(chainer.Chain):
         self.regularize_bn = parse_dict(config, 'regularize_bn')
         self.seen_thresh = parse_dict(config, 'seen_thresh')
         self.seen = 0
+        self.prev_sum_wh = 0
+        self.bbox_pred_orig = None
+        self.rescale_xy = None
 
         if self.anchors:
             self.anchors = np.array(self.anchors, 'f').reshape(-1, 2)
             self.anchors = self.anchors.reshape(3, 3, 2)
+            self.anchors = self.xp.reshape(self.anchors, (3, 1, 3, 2))
 
         out_ch = self.n_boxes * (self.n_classes + 4 + 1)
         with self.init_scope():
@@ -428,7 +433,7 @@ class YOLOv3_base(chainer.Chain):
                            gt_boxes, gt_labels, gmap, num_labels,
                            x_shift, y_shift, w_anchor, h_anchor,
                            out_h, out_w, tx, ty, tw, th, tconf, tprob,
-                           coord_scale_array, conf_scale_array):
+                           coord_scale_array, conf_scale_array, i):
         """
         Args:
             pred_x(array): Shape is (B, n_boxes, out_h, out_w, 4)
@@ -440,9 +445,9 @@ class YOLOv3_base(chainer.Chain):
         """
         batchsize = int(gmap.shape[0])
         num_labels = chainer.cuda.to_cpu(num_labels)
-        batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
-        target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0])], dtype='i')
-        label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]]], dtype='i')
+        batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0]) if int(gmap[b, n, 2] / 3) == i], dtype='i')
+        target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0]) if int(gmap[b, n, 2] / 3) == i], dtype='i')
+        label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]] if int(gmap[b, n, 2] / 3) == i], dtype='i')
         num_positive = len(label_index)
         each_indexes = gmap[batch_index, target_index]
         x_index = each_indexes[:, 0]
@@ -524,84 +529,88 @@ class YOLOv3_base(chainer.Chain):
             imgs(array): Shape is (B, 3, H, W)
             gt_boxes(array): Shape is (B, Max target, 4)
             gt_labels(array): Shape is (B, Max target)
+            gmap(array): Shape is (B, Max target, 3). (x, y, box_index)
         """
         output = self.model(imgs)
         N, input_channel, input_h, input_w = imgs.shape
-        N, _, out_h, out_w = output.shape
-        shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
-        pred_xy, pred_wh, pred_conf, pred_prob = \
-            F.split_axis(F.reshape(output, shape), (2, 4, 5,), axis=2)
-        pred_xy = F.sigmoid(pred_xy) # shape is (N, n_boxes, 2, out_h, out_w)
-        pred_wh_exp = F.exp(pred_wh) # shape is (N, n_boxes, 2, out_h, out_w)
-        pred_conf = F.sigmoid(pred_conf[:, :, 0]) # (N, n_boxes, out_h, out_w)
-        pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
-        pred_prob = F.softmax(pred_prob, axis=4)
+        x_loss, y_loss, w_loss, h_loss, conf_loss, prob_loss, total_loss = \
+            0, 0, 0, 0, 0, 0, 0
+        for i, output in enumerate(output_list):
+            N, _, out_h, out_w = output.shape
+            shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
+            pred_xy, pred_wh, pred_conf, pred_prob = \
+                F.split_axis(F.reshape(output, shape), (2, 4, 5,), axis=2)
+            pred_xy = F.sigmoid(pred_xy) # shape is (N, n_boxes, 2, out_h, out_w)
+            pred_wh_exp = F.exp(pred_wh) # shape is (N, n_boxes, 2, out_h, out_w)
+            pred_conf = F.sigmoid(pred_conf[:, :, 0]) # (N, n_boxes, out_h, out_w)
+            pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
+            pred_prob = F.softmax(pred_prob, axis=4)
 
-        with self.xp.cuda.Device(chainer.cuda.get_device_from_array(pred_xy.data)):
-            shape = (N, self.n_boxes, out_h, out_w)
-            x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
-            y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
-            if self.anchors.ndim != 4:
-                self.anchors = self.xp.array(self.anchors, dtype='f')
-                self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
-            w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
-            h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
+            with self.xp.cuda.Device(chainer.cuda.get_device_from_array(pred_xy.data)):
+                shape = (N, self.n_boxes, out_h, out_w)
+                x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
+                y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
+                if self.anchors.ndim != 4:
+                    self.anchors = self.xp.array(self.anchors, dtype='f')
+                    self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
+                w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
+                h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
 
-            bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
-            bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
-            bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / out_w
-            bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / out_h
+                # scale to [0, 1]
+                bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w # image[1]
+                bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h # image[0]
+                bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / input_w
+                bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / input_h
 
-            tx = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            ty = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            tw = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            th = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            tconf = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            tprob = pred_prob.data.copy()
+                tx = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                ty = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                tw = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                th = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                tconf = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                tprob = pred_prob.data.copy()
 
-            coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-            conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
+                conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
 
-            self.seen += N
-            if self.regularize_box and self.seen < self.seen_thresh:
-                tx[:] = 0.5
-                ty[:] = 0.5
-                coord_scale_array[:] = 0.01
+                self.seen += N
+                if self.regularize_box and self.seen < self.seen_thresh:
+                    tx[:] = 0.5
+                    ty[:] = 0.5
+                    coord_scale_array[:] = 0.01
 
-            conf_scale_array = \
-                self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
-                                   gt_boxes, conf_scale_array)
+                conf_scale_array = \
+                    self.calc_best_iou(bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
+                                       gt_boxes, conf_scale_array)
 
-            tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive = \
-                self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
-                                        bbox_pred_h,
-                                        gt_boxes, gt_labels, gmap, num_labels,
-                                        x_shift, y_shift, w_anchor, h_anchor,
-                                        out_h, out_w, tx, ty, tw, th, tconf, tprob,
-                                        coord_scale_array, conf_scale_array)
+                tx, ty, tw, th, tconf, tprob, coord_scale_array, conf_scale_array, num_positive = \
+                    self.calc_iou_anchor_gt(bbox_pred_x, bbox_pred_y, bbox_pred_w,
+                                            bbox_pred_h,
+                                            gt_boxes, gt_labels, gmap, num_labels,
+                                            x_shift, y_shift, w_anchor, h_anchor,
+                                            out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                                            coord_scale_array, conf_scale_array, i)
 
-            gamma_loss = 0
-            if self.regularize_bn: # new feature
-                for layer in self.layer_bn_list:
-                    layer = getattr(self, layer)
-                    gamma = layer.gamma
-                    gamma_loss += F.sum(F.absolute(gamma))
-                gamma_loss *= self.regularize_bn
-
-            x_loss = F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.
-            y_loss = F.sum(((ty - pred_xy[:, :, 1]) ** 2) * coord_scale_array) / 2.
-            w_loss = F.sum(((tw - pred_wh[:, :, 0]) ** 2) * coord_scale_array) / 2.
-            h_loss = F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
-            conf_loss = F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
-            prob_loss = F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
+                x_loss += F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.
+                y_loss += F.sum(((ty - pred_xy[:, :, 1]) ** 2) * coord_scale_array) / 2.
+                w_loss += F.sum(((tw - pred_wh[:, :, 0]) ** 2) * coord_scale_array) / 2.
+                h_loss += F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
+                conf_loss += F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
+                prob_loss += F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
             total_loss = x_loss + y_loss + w_loss + h_loss + \
                              conf_loss + prob_loss
             num_positive = max(1, num_positive)
             total_loss /= num_positive
 
-            if not isinstance(gamma_loss, int):
-                total_loss += gamma_loss
-                chainer.report({'gamma': gamma}, self)
+            # gamma_loss = 0
+            # if self.regularize_bn: # new feature
+            #     for layer in self.layer_bn_list:
+            #         layer = getattr(self, layer)
+            #         gamma = layer.gamma
+            #         gamma_loss += F.sum(F.absolute(gamma))
+            #     gamma_loss *= self.regularize_bn
+            # if not isinstance(gamma_loss, int):
+            #     total_loss += gamma_loss
+            #     chainer.report({'gamma': gamma}, self)
             chainer.report({'total_loss': total_loss}, self)
             chainer.report({'xy_loss': x_loss + y_loss}, self)
             chainer.report({'wh_loss': w_loss + h_loss}, self)
@@ -712,35 +721,53 @@ class YOLOv3_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-            output = self.model(imgs).data
+            output = self.model(imgs)
             N, input_channel, input_h, input_w = imgs.shape
-            N, _, out_h, out_w = output.shape
-            shape = (N, 3, self.n_boxes, self.n_classes+5, out_h, out_w)
-            xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=2)
-            xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
-            wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
-            shape = (N, self.n_boxes, out_h, out_w)
-            x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
-            y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
-            if self.anchors.ndim != 4:
-                n_device = chainer.cuda.get_device_from_array(output)
+            shape_wh = [i.shape[2:] for i in output]
+            output = [self.xp.reshape(o, (N, self.n_boxes*(self.n_classes+5), -1)) for o in output]
+            output = self.xp.concatenate(output, axis=2) # Shape is (N, n_boxes*(n_classes+5), out_h*out_w * 3??)
+            output = self.xp.transpose(output, (0, 2, 1))
+            _, sum_wh, _ = output.shape
+            shape = (N, sum_wh, self.n_boxes, self.n_classes+5)
+            xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=3)
+            xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h*out_w)
+            wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h*out_w)
+
+            if self.prev_sum_wh != sum_wh:
+                n_device = chainer.cuda.get_device_from_array(xy)
                 if n_device.id != -1:
                     self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
-                self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
-            w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
-            h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
-            bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
-            bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
-            bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
-            bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor / out_w * img_shape[1]
-            bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor / out_h * img_shape[0]
-            conf = F.sigmoid(conf[:, :, 0]).data
-            prob = prob.transpose(0, 1, 3, 4, 2)
+
+                self.bbox_pred_orig = self.xp.empty((N, sum_wh, self.n_boxes, 4), dtype='f')
+                self.re_scale_xy = self.xp.empty((N, sum_wh, self.n_boxes, 2), dtype='f')
+                pre_i = 0
+                for i in range(3):
+                    out_h, out_w = shape_wh[i]
+                    shape = (N, out_h, out_w, self.n_boxes)
+                    x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, out_w, 1), shape)
+                    y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, out_h, 1, 1), shape)
+                    x_shift = self.xp.reshape(x_shift, (N, out_h*out_w, self.n_boxes))
+                    y_shift = self.xp.reshape(y_shift, (N, out_h*out_w, self.n_boxes))
+                    anchors = self.anchors[i, :, :, :]
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 0] = x_shift
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 1] = y_shift
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 2] = anchors[:, :, 0][:]
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 3] = anchors[:, :, 1][:]
+                    self.re_scale_xy[:, pre_i:pre_i+out_h*out_w, :, 0] = img_shape[1] / out_w
+                    self.re_scale_xy[:, pre_i:pre_i+out_h*out_w, :, 1] = img_shape[0] / out_h
+                    pre_i += out_h*out_w
+
+            bbox_pred = self.bbox_pred_orig.copy()
+            bbox_pred[:, :, :, :2] += xy
+            bbox_pred[:, :, :, :2] *= self.re_scale_xy
+            bbox_pred[:, :, :, 2:] *= wh
+            conf = F.sigmoid(conf[:, :, :, 0]).data # Shape is (N, out_h*out_w, n_boxes, 1)
             prob = F.sigmoid(prob).data
+            self.prev_sum_wh = sum_wh
             return bbox_pred, conf, prob
 
     def inference2(self, imgs, img_shape):
-        """Inference.
+        """Inference using For loop.
 
         Args:
             imgs(array): Shape is (1, 3, H, W)
@@ -763,20 +790,18 @@ class YOLOv3_base(chainer.Chain):
                 xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
                 wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
                 shape = (N, self.n_boxes, out_h, out_w)
-                x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
-                y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
+                x_shift = self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w)
+                y_shift = self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1)
                 if self.anchors.ndim != 5:
                     n_device = chainer.cuda.get_device_from_array(output)
                     if n_device.id != -1:
                         self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
                     self.anchors = self.xp.reshape(self.anchors, (3, 1, self.n_boxes, 2, 1))
-                w_anchor = self.xp.broadcast_to(self.anchors[i, :, :, :1, :], shape)
-                h_anchor = self.xp.broadcast_to(self.anchors[i, :, :, 1:, :], shape)
                 bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
                 bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
                 bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
-                bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor
-                bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor
+                bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * self.anchors[i, :, :, :1, :] #w_anchor
+                bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * self.anchors[i, :, :, 1:, :] #h_anchor
                 conf = F.sigmoid(conf[:, :, 0]).data
                 prob = prob.transpose(0, 1, 3, 4, 2)
                 prob = F.sigmoid(prob).data

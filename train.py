@@ -17,7 +17,8 @@ from chainer.datasets import TransformDataset
 from chainercv.links.model.ssd import random_distort
 
 from config_utils import *
-from datasets.transform import Transform
+from datasets.transform import Transform as Transform_v2
+from datasets.v3_transform import Transform as Transform_v3
 
 chainer.cuda.set_max_workspace_size(1024 * 1024 * 1024)
 os.environ["CHAINER_TYPE_CHECK"] = "0"
@@ -35,6 +36,7 @@ def train_yolov2():
     devices = parse_devices(config['gpus'], config['updater']['name'])
     train_data, test_data = load_dataset(config["dataset"])
 
+    Transform = Transform_v2 if parse_dict(config, 'version', '2') == '2' else Transform_v3
     train_data = TransformDataset(
         train_data, Transform(0.5, dim=model.dim, max_target=30,
                               anchors=model.anchors, batchsize=config['iterator']['train_batchsize']))

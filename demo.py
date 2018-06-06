@@ -40,13 +40,17 @@ yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
 def demo_yolov2():
     """Demo yolov2."""
     config, args = parse_args()
+
+    h = args.height
+    w = args.width
+    config['model']['height'] = h
+    config['model']['width'] = w
+
     model = get_model(config["model"])
     if args.gpu != -1:
         model.to_gpu(args.gpu)
 
     img_path = args.img_path
-    h = args.height
-    w = args.width
     thresh = args.thresh
     nms_thresh = args.nms_thresh
     label_names = open(args.name, 'r').read().split('\n')[:-1]
@@ -59,7 +63,7 @@ def demo_yolov2():
     dummy = np.zeros((1, 3, h, w), dtype='f') + 1
     if args.gpu != -1:
         dummy = chainer.cuda.to_gpu(dummy, device=args.gpu)
-    model.inference(dummy, orig_shape)
+    model.inference(dummy, img_shape)
 
     # Inference
     if args.gpu != -1:
@@ -67,7 +71,7 @@ def demo_yolov2():
         img = chainer.cuda.to_gpu(img, device=args.gpu)
     else:
         start = time.time()
-    bbox_pred, conf, prob = model.inference(img, img_shape)
+    bbox_pred, conf, prob = model.inference(img, img_shape)#img_shape)
     bbox_pred = bbox_pred.reshape(-1, 4)
     conf = conf.reshape(-1)
     prob = prob.reshape(-1, model.n_classes)
