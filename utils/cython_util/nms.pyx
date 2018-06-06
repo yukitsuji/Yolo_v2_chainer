@@ -220,15 +220,14 @@ def nms_gt_anchor(np.ndarray[DTYPE_t, ndim=1] gt_w,
 @cython.profile(False)
 def nms_gt_anchor_v3(np.ndarray[DTYPE_t, ndim=2] gt_bbox,
                      np.ndarray[DTYPE_t, ndim=2] anchor_wh,
-                     np.ndarray[DTYPE_int_t, ndim=1] donwscale,
+                     np.ndarray[DTYPE_int_t, ndim=1] downscale,
                      int net_h, int net_w):
-
     cdef int num_anchor = anchor_wh.shape[0]
-    cdef int num_gt = gt_w.shape[0]
+    cdef int num_gt = gt_bbox.shape[0]
     cdef np.ndarray[DTYPE_int_t, ndim=2] results = np.zeros((num_gt, 3), dtype=DTYPE_int)
     cdef int i, j
     cdef float iou, best_iou
-    cdef float t_w, t_h, a_h, aw, inter_h, inter_w,
+    cdef float a_h, a_w, inter_h, inter_w,
     cdef intersect, union
     cdef int best_index, scale_index
     cdef float gt_w, gt_h, gt_x, gt_y
@@ -264,9 +263,8 @@ def nms_gt_anchor_v3(np.ndarray[DTYPE_t, ndim=2] gt_bbox,
             if iou > best_iou:
                 best_iou = iou
                 best_index = j
-
         scale_index = int(best_index / num_scale)
-        results[i, 0] = grid_scale[scale_index, 0]
-        results[i, 1] = grid_scale[scale_index, 1]
+        results[i, 0] = int(gt_x * grid_scale[scale_index, 0])
+        results[i, 1] = int(gt_y * grid_scale[scale_index, 1])
         results[i, 2] = best_index
     return results

@@ -432,7 +432,7 @@ class YOLOv3_base(chainer.Chain):
     def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
                            gt_boxes, gt_labels, gmap, num_labels,
                            x_shift, y_shift, w_anchor, h_anchor,
-                           out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                           out_h, out_w, net_h, net_w, tx, ty, tw, th, tconf, tprob,
                            coord_scale_array, conf_scale_array, i):
         """
         Args:
@@ -447,37 +447,37 @@ class YOLOv3_base(chainer.Chain):
         num_labels = chainer.cuda.to_cpu(num_labels)
         batch_index = self.xp.array([b for b in range(batchsize) for n in range(num_labels[b, 0]) if int(gmap[b, n, 2] / 3) == i], dtype='i')
         target_index = self.xp.array([n for b in range(batchsize) for n in range(num_labels[b, 0]) if int(gmap[b, n, 2] / 3) == i], dtype='i')
-        label_index = self.xp.array([n for b in range(batchsize) for n in gt_labels[b, :num_labels[b, 0]] if int(gmap[b, n, 2] / 3) == i], dtype='i')
+        label_index = self.xp.array([n for b in range(batchsize) for k, n in enumerate(gt_labels[b, :num_labels[b, 0]]) if int(gmap[b, k, 2] / 3) == i], dtype='i')
         num_positive = len(label_index)
         each_indexes = gmap[batch_index, target_index]
         x_index = each_indexes[:, 0]
         y_index = each_indexes[:, 1]
         bbox_index = each_indexes[:, 2]
-
+        if len(bbox_index):
+            bbox_index -= i*3
         gt_boxes = gt_boxes[batch_index, target_index]
         gt_boxes_w = gt_boxes[:, 3] - gt_boxes[:, 1]
         gt_boxes_h = gt_boxes[:, 2] - gt_boxes[:, 0]
-        bp_x = bbox_pred_x[batch_index, bbox_index, y_index, x_index]
-        bp_y = bbox_pred_y[batch_index, bbox_index, y_index, x_index]
-        bp_w = bbox_pred_w[batch_index, bbox_index, y_index, x_index]
-        bp_h = bbox_pred_h[batch_index, bbox_index, y_index, x_index]
+        #bp_x = bbox_pred_x[batch_index, bbox_index, y_index, x_index]
+        #bp_y = bbox_pred_y[batch_index, bbox_index, y_index, x_index]
+        #bp_w = bbox_pred_w[batch_index, bbox_index, y_index, x_index]
+        #bp_h = bbox_pred_h[batch_index, bbox_index, y_index, x_index]
 
-        left_x = self.xp.maximum(bp_x - bp_w / 2., gt_boxes[:, 1])
-        right_x = self.xp.minimum(bp_x + bp_w / 2., gt_boxes[:, 3])
-        top_y = self.xp.maximum(bp_y - bp_h / 2., gt_boxes[:, 0])
-        bottom_y = self.xp.minimum(bp_y + bp_h / 2., gt_boxes[:, 2])
+        #left_x = self.xp.maximum(bp_x - bp_w / 2., gt_boxes[:, 1])
+        #right_x = self.xp.minimum(bp_x + bp_w / 2., gt_boxes[:, 3])
+        #top_y = self.xp.maximum(bp_y - bp_h / 2., gt_boxes[:, 0])
+        #bottom_y = self.xp.minimum(bp_y + bp_h / 2., gt_boxes[:, 2])
 
-        intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
-        union = bp_w * bp_h + gt_boxes_w * gt_boxes_h
-        iou = intersect / (union - intersect + 1e-3)
+        #intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
+        #union = bp_w * bp_h + gt_boxes_w * gt_boxes_h
+        #iou = intersect / (union - intersect + 1e-3)
 
         tx[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 1] + gt_boxes_w / 2.) * out_w - x_shift[batch_index, bbox_index, y_index, x_index]
         ty[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 0] + gt_boxes_h / 2.) * out_h - y_shift[batch_index, bbox_index, y_index, x_index]
-        tw[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_w * out_w / w_anchor[batch_index, bbox_index, y_index, x_index])
-        th[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_h * out_h / h_anchor[batch_index, bbox_index, y_index, x_index])
+        tw[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_w * net_w / w_anchor[batch_index, bbox_index, y_index, x_index])
+        th[batch_index, bbox_index, y_index, x_index] = self.xp.log(gt_boxes_h * net_h / h_anchor[batch_index, bbox_index, y_index, x_index])
         coord_scale_array[batch_index, bbox_index, y_index, x_index] = self.coord_scale * (2 - gt_boxes_h * gt_boxes_w)
-
-        tconf[batch_index, bbox_index, y_index, x_index] = iou
+        tconf[batch_index, bbox_index, y_index, x_index] = 1 #iou
         conf_scale_array[batch_index, bbox_index, y_index, x_index] = self.object_scale
         tprob[batch_index, bbox_index, y_index, x_index] = 0
         tprob[batch_index, bbox_index, y_index, x_index, label_index] = 1
@@ -531,7 +531,7 @@ class YOLOv3_base(chainer.Chain):
             gt_labels(array): Shape is (B, Max target)
             gmap(array): Shape is (B, Max target, 3). (x, y, box_index)
         """
-        output = self.model(imgs)
+        output_list = self.model(imgs)
         N, input_channel, input_h, input_w = imgs.shape
         x_loss, y_loss, w_loss, h_loss, conf_loss, prob_loss, total_loss = \
             0, 0, 0, 0, 0, 0, 0
@@ -544,21 +544,21 @@ class YOLOv3_base(chainer.Chain):
             pred_wh_exp = F.exp(pred_wh) # shape is (N, n_boxes, 2, out_h, out_w)
             pred_conf = F.sigmoid(pred_conf[:, :, 0]) # (N, n_boxes, out_h, out_w)
             pred_prob = pred_prob.transpose(0, 1, 3, 4, 2)
-            pred_prob = F.softmax(pred_prob, axis=4)
+            pred_prob = F.sigmoid(pred_prob)
 
             with self.xp.cuda.Device(chainer.cuda.get_device_from_array(pred_xy.data)):
                 shape = (N, self.n_boxes, out_h, out_w)
                 x_shift = self.xp.broadcast_to(self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w), shape)
                 y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1), shape)
-                if self.anchors.ndim != 4:
+                if self.anchors.ndim != 5:
                     self.anchors = self.xp.array(self.anchors, dtype='f')
-                    self.anchors = self.xp.reshape(self.anchors, (1, self.n_boxes, 2, 1))
-                w_anchor = self.xp.broadcast_to(self.anchors[:, :, :1, :], shape)
-                h_anchor = self.xp.broadcast_to(self.anchors[:, :, 1:, :], shape)
+                    self.anchors = self.xp.reshape(self.anchors, (3, 1, self.n_boxes, 2, 1))
+                w_anchor = self.xp.broadcast_to(self.anchors[i, :, :, :1, :], shape)
+                h_anchor = self.xp.broadcast_to(self.anchors[i, :, :, 1:, :], shape)
 
                 # scale to [0, 1]
-                bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w # image[1]
-                bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h # image[0]
+                bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w 
+                bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
                 bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / input_w
                 bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / input_h
 
@@ -571,7 +571,6 @@ class YOLOv3_base(chainer.Chain):
 
                 coord_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
                 conf_scale_array = self.xp.zeros((N, self.n_boxes, out_h, out_w), dtype='f')
-
                 self.seen += N
                 if self.regularize_box and self.seen < self.seen_thresh:
                     tx[:] = 0.5
@@ -587,7 +586,8 @@ class YOLOv3_base(chainer.Chain):
                                             bbox_pred_h,
                                             gt_boxes, gt_labels, gmap, num_labels,
                                             x_shift, y_shift, w_anchor, h_anchor,
-                                            out_h, out_w, tx, ty, tw, th, tconf, tprob,
+                                            out_h, out_w, input_h, input_w, 
+                                            tx, ty, tw, th, tconf, tprob,
                                             coord_scale_array, conf_scale_array, i)
 
                 x_loss += F.sum(((tx - pred_xy[:, :, 0]) ** 2) * coord_scale_array) / 2.

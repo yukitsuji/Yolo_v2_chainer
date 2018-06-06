@@ -25,6 +25,7 @@ from chainer import iterators
 from chainer.training import extensions
 
 import chainercv
+from chainercv.datasets import voc_bbox_label_names
 from chainer.datasets import ConcatenatedDataset
 from chainer.training import triggers
 
@@ -185,7 +186,9 @@ def create_iterator(train_data, test_data, config, devices, updater_name):
         train_iter = Iterator(train_data, config['train_batchsize'], **args)
 
     args['repeat'] = False
-    test_iter = Iterator(test_data, config['test_batchsize'], **args)
+    test_iter = None
+    if test_data is not None:
+        test_iter = Iterator(test_data, config['test_batchsize'], **args)
     return train_iter, test_iter
 
 def parse_devices(gpus, updater_name):
@@ -223,10 +226,12 @@ def load_dataset(config):
         train_data2 = train_loader(**train_config['args'])
         train_data = ConcatenatedDataset(train_data, train_data2)
 
-    test_config = config['valid']
-    cl = get_class(test_config['module'])
-    test_loader = getattr(cl, test_config['name'])
-    test_data = test_loader(**test_config['args'])
+    test_data = None
+    if parse_dict(config, 'valid', None):
+        test_config = config['valid']
+        cl = get_class(test_config['module'])
+        test_loader = getattr(cl, test_config['name'])
+        test_data = test_loader(**test_config['args'])
     return train_data, test_data
 
 def get_model(config):

@@ -169,7 +169,7 @@ class Transform(object):
                  anchors=None, n_boxes=5, downscale=[32, 16, 8]):
         self.value = value
         self.max_target = max_target
-        self.anchors = anchors
+        self.anchors = anchors.reshape(-1, 2)
         self.dim = dim
         self.output_shape = (dim[0], dim[0])
         self.batchsize = batchsize
@@ -259,7 +259,7 @@ class Transform(object):
         bbox = transforms.flip_bbox(
                    bbox, self.output_shape, x_flip=params['x_flip'])
 
-        # Preparation for Yolov2 network
+        # Preparation for Yolov2 network. scale=[0, 1]
         bbox[:, ::2] /= self.output_shape[0] # y
         bbox[:, 1::2] /= self.output_shape[1] # x
 
@@ -293,6 +293,6 @@ def create_map_anchor_gt(bbox, anchors, output_shape, downscale, n_boxes,
     num_bbox = len(bbox)
     if num_bbox:
         net_h, net_w = output_shape
-        gmap = nms_gt_anchor_v3(gt_bbox, anchors, downscale
-                                net_h, net_w)
+        gmap[:num_bbox] = nms_gt_anchor_v3(bbox, anchors.copy(), downscale,
+                                           int(net_h), int(net_w))
     return gmap
