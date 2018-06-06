@@ -65,14 +65,14 @@ dataset:
       return_difficult: True
 
 updater:
-  name: MultiprocessParallelUpdater
+  name: ParallelUpdater # StandardUpdater
 
 iterator:
-  name: MultithreadIterator
-  train_batchsize: 8
+  name: MultithreadIterator #MultiprocessIterator #SerialIterator
+  train_batchsize: 64
   test_batchsize: 8
   args:
-   n_threads: 4
+   n_threads: 16
 
 optimizer:
   name: MomentumSGD

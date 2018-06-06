@@ -66,8 +66,11 @@ def to_chainer_converter():
             conv.W.data = orig_data[offset: offset + out_ch * in_ch * h * w].reshape(out_ch, in_ch, h, w)
             offset += out_ch * in_ch * h * w
             i += 1
+            if args.darknet and i == 53:
+                break
         except:
             print("Load last convolutional layer", offset, i)
+            break
 
 
     save_name = "{}.npz".format(args.name)

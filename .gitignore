@@ -18,3 +18,4 @@ weight/
 utils/cython_util/nms.cpp
 darknet19_448.conv.23
 copy_param.py
+darknet53.conv.74

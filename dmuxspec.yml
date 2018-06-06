@@ -19,7 +19,6 @@ hardware:
 - cpu==16
 - ram==128419
 - disk==10000
-- gpu==4
+- gpu==8
 datasets:
 - yukitsuji_voc==1 @ /home/user/.chainer/dataset/pfnet/chainer/voc
-  #- yukitsuji==1 @ /home/user/.chainer/dataset/pfnet/chainer/kitti_detection

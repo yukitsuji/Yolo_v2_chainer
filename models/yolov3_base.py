@@ -558,7 +558,7 @@ class YOLOv3_base(chainer.Chain):
                 h_anchor = self.xp.broadcast_to(self.anchors[i, :, :, 1:, :], shape)
 
                 # scale to [0, 1]
-                bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w 
+                bbox_pred_x = (pred_xy[:, :, 0].data + x_shift) / out_w
                 bbox_pred_y = (pred_xy[:, :, 1].data + y_shift) / out_h
                 bbox_pred_w = pred_wh_exp[:, :, 0].data * w_anchor / input_w
                 bbox_pred_h = pred_wh_exp[:, :, 1].data * h_anchor / input_h
@@ -587,7 +587,7 @@ class YOLOv3_base(chainer.Chain):
                                             bbox_pred_h,
                                             gt_boxes, gt_labels, gmap, num_labels,
                                             x_shift, y_shift, w_anchor, h_anchor,
-                                            out_h, out_w, input_h, input_w, 
+                                            out_h, out_w, input_h, input_w,
                                             tx, ty, tw, th, tconf, tprob,
                                             coord_scale_array, conf_scale_array, i)
 
@@ -726,7 +726,7 @@ class YOLOv3_base(chainer.Chain):
             output = self.model(imgs)
             N, input_channel, input_h, input_w = imgs.shape
             shape_wh = [i.shape[2:] for i in output]
-            output = [self.xp.reshape(o, (N, self.n_boxes*(self.n_classes+5), -1)) for o in output]
+            output = [self.xp.reshape(o.data, (N, self.n_boxes*(self.n_classes+5), -1)) for o in output]
             output = self.xp.concatenate(output, axis=2) # Shape is (N, n_boxes*(n_classes+5), out_h*out_w * 3??)
             output = self.xp.transpose(output, (0, 2, 1))
             _, sum_wh, _ = output.shape
@@ -782,20 +782,20 @@ class YOLOv3_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-            output_list = self.model(imgs)#.data
+            output_list = self.model(imgs)
             bbox_list, conf_list, prob_list = [], [], []
             for i, output in enumerate(output_list):
                 N, input_channel, input_h, input_w = imgs.shape
                 N, _, out_h, out_w = output.shape
                 shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
-                xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=2)
+                xy, wh, conf, prob = self.xp.split(self.xp.reshape(output.data, shape), (2, 4, 5,), axis=2)
                 xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
                 wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
                 shape = (N, self.n_boxes, out_h, out_w)
                 x_shift = self.xp.arange(out_w, dtype='f').reshape(1, 1, 1, out_w)
                 y_shift = self.xp.arange(out_h, dtype='f').reshape(1, 1, out_h, 1)
                 if self.anchors.ndim != 5:
-                    n_device = chainer.cuda.get_device_from_array(output)
+                    n_device = chainer.cuda.get_device_from_array(xy)
                     if n_device.id != -1:
                         self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
                     self.anchors = self.xp.reshape(self.anchors, (3, 1, self.n_boxes, 2, 1))
