@@ -421,7 +421,8 @@ class YOLOv3_base(chainer.Chain):
         h = F.leaky_relu(self.bn73(self.conv73(h)), slope=0.1)
         h1 = F.leaky_relu(self.bn74(self.conv74(h)), slope=0.1)
         out_8 = self.conv75(h1)
-        return F.concat([out_8, out_16, out_32], axis=1)
+        return [out_32.data, out_16.data, out_8.data]
+        # return F.concat([out_8, out_16, out_32], axis=1)
 
     def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
                            gt_boxes, gt_labels, gmap, num_labels,
@@ -752,12 +753,12 @@ class YOLOv3_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-            output_list = self.model(imgs).data
+            output_list = self.model(imgs)#.data
             bbox_list, conf_list, prob_list = [], [], []
             for i, output in enumerate(output_list):
                 N, input_channel, input_h, input_w = imgs.shape
                 N, _, out_h, out_w = output.shape
-                shape = (N, 3, self.n_boxes, self.n_classes+5, out_h, out_w)
+                shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
                 xy, wh, conf, prob = self.xp.split(self.xp.reshape(output, shape), (2, 4, 5,), axis=2)
                 xy = F.sigmoid(xy).data # shape is (N, n_boxes, 2, out_h, out_w)
                 wh = F.exp(wh).data # shape is (N, n_boxes, 2, out_h, out_w)
@@ -772,10 +773,10 @@ class YOLOv3_base(chainer.Chain):
                 w_anchor = self.xp.broadcast_to(self.anchors[i, :, :, :1, :], shape)
                 h_anchor = self.xp.broadcast_to(self.anchors[i, :, :, 1:, :], shape)
                 bbox_pred = self.xp.zeros((N, self.n_boxes, out_h, out_w, 4), 'f')
-                bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) * (out_w * img_shape[1])
-                bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) * (out_h * img_shape[0])
-                bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor # out_w * img_shape[1]
-                bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor # out_h * img_shape[0]
+                bbox_pred[:, :, :, :, 0] = (xy[:, :, 0] + x_shift) / out_w * img_shape[1]
+                bbox_pred[:, :, :, :, 1] = (xy[:, :, 1] + y_shift) / out_h * img_shape[0]
+                bbox_pred[:, :, :, :, 2] = wh[:, :, 0] * w_anchor
+                bbox_pred[:, :, :, :, 3] = wh[:, :, 1] * h_anchor
                 conf = F.sigmoid(conf[:, :, 0]).data
                 prob = prob.transpose(0, 1, 3, 4, 2)
                 prob = F.sigmoid(prob).data
@@ -801,15 +802,10 @@ class YOLOv3_base(chainer.Chain):
         """
         with chainer.using_config('train', False), \
                  chainer.function.no_backprop_mode():
-
-            # Prepare images for model.
             input_imgs, orig_sizes, delta_sizes = self.prepare(imgs)
             bbox_pred, conf, prob = self.inference(input_imgs,
                                                    (self.height, self.width))
             batchsize = len(input_imgs)
-            # bbox_pred = bbox_pred.reshape(batchsize, -1, 4)
-            # conf = conf.reshape(batchsize, -1)
-            # prob = prob.reshape(batchsize, -1, self.n_classes)
             bbox_preds = chainer.cuda.to_cpu(bbox_pred)
             confs = chainer.cuda.to_cpu(conf)
             probs = chainer.cuda.to_cpu(prob)
