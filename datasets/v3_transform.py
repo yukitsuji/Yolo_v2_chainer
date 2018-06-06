@@ -200,7 +200,6 @@ class Transform(object):
             self.i += 1
             i = self.i % len(self.dim)
             self.output_shape = (self.dim[i], self.dim[i])
-        # print(self.count, self.i, self.output_shape)
         self.count += 1
 
         img, bbox, label = in_data

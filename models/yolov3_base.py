@@ -426,7 +426,7 @@ class YOLOv3_base(chainer.Chain):
         h = F.leaky_relu(self.bn73(self.conv73(h)), slope=0.1)
         h1 = F.leaky_relu(self.bn74(self.conv74(h)), slope=0.1)
         out_8 = self.conv75(h1)
-        return [out_32.data, out_16.data, out_8.data]
+        return [out_32, out_16, out_8]
         # return F.concat([out_8, out_16, out_32], axis=1)
 
     def calc_iou_anchor_gt(self, bbox_pred_x, bbox_pred_y, bbox_pred_w, bbox_pred_h,
@@ -535,6 +535,7 @@ class YOLOv3_base(chainer.Chain):
         N, input_channel, input_h, input_w = imgs.shape
         x_loss, y_loss, w_loss, h_loss, conf_loss, prob_loss, total_loss = \
             0, 0, 0, 0, 0, 0, 0
+        sum_positive = 0
         for i, output in enumerate(output_list):
             N, _, out_h, out_w = output.shape
             shape = (N, self.n_boxes, self.n_classes+5, out_h, out_w)
@@ -596,10 +597,11 @@ class YOLOv3_base(chainer.Chain):
                 h_loss += F.sum(((th - pred_wh[:, :, 1]) ** 2) * coord_scale_array) / 2.
                 conf_loss += F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
                 prob_loss += F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
+                sum_positive += num_positive
             total_loss = x_loss + y_loss + w_loss + h_loss + \
                              conf_loss + prob_loss
-            num_positive = max(1, num_positive)
-            total_loss /= num_positive
+            sum_positive = max(1, sum_positive)
+            total_loss /= sum_positive
 
             # gamma_loss = 0
             # if self.regularize_bn: # new feature

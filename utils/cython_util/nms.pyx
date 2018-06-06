@@ -238,8 +238,8 @@ def nms_gt_anchor_v3(np.ndarray[DTYPE_t, ndim=2] gt_bbox,
     cdef int num_scale = downscale.shape[0]
     cdef np.ndarray[DTYPE_int_t, ndim=2] grid_scale = np.zeros((num_scale, 2), dtype=DTYPE_int)
     for i in range(num_scale):
-        grid_scale[i, 0] = int(net_h / downscale[i])
-        grid_scale[i, 1] = int(net_w / downscale[i])
+        grid_scale[i, 0] = int(net_w / downscale[i])
+        grid_scale[i, 1] = int(net_h / downscale[i])
 
     for i in range(num_gt):
         gt_w = gt_bbox[i, 3] - gt_bbox[i, 1]
