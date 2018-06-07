@@ -1,0 +1,129 @@
+end_trigger: [80400, "iteration"] # 160800
+results: results
+gpus: [0, 1, 2, 3, 4, 5, 6, 7]
+mode: Train
+seed: 1
+version: 3
+
+model:
+  module: models.yolov3_base
+  name: YOLOv3_base
+  pretrained_model:
+    path: #darknet_53.npz
+    download: #https://www.dropbox.com/s/zkq40xp7mo80z0e/darknet19_448.npz
+  architecture:
+    n_classes: 20
+    n_boxes: 3
+    grid_scale: [32, 16, 8]
+    anchors: [116, 90, 156, 198, 373, 326, 30, 61, 62, 45, 59, 119,
+              10, 13, 16, 30, 33, 23]
+    dim: [384, 512, 416, 448, 480, 544, 352]
+    # dim: [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
+    object_scale: 1
+    noobject_scale: 1
+    class_scale: 1
+    coord_scale: 1
+    best_iou_thresh: 0.5
+    height: 416
+    width: 416
+    thresh : 0.001
+    nms_thresh: 0.5 #0.45
+    nms: class
+    seen_thresh: 0 #12800
+    regularize_box: 0 #1
+    regularize_bn: 0 #0.00001
+
+dataset:
+  train:
+    module: chainercv.datasets
+    name: VOCBboxDataset
+    args:
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2012
+      year: '2012'
+      split: trainval
+      use_difficult: False
+      return_difficult: False
+
+  train2:
+    module: chainercv.datasets
+    name: VOCBboxDataset
+    args:
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
+      year: '2007'
+      split: trainval
+      use_difficult: False
+      return_difficult: False
+
+  valid:
+    module: chainercv.datasets
+    name: VOCBboxDataset
+    args:
+      data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
+      year: '2007'
+      split: test
+      use_difficult: True
+      return_difficult: True
+
+updater:
+  name: MultiprocessParallelUpdater
+
+iterator:
+  name: MultithreadIterator
+  train_batchsize: 8
+  test_batchsize: 8
+  args:
+   n_threads: 4
+
+optimizer:
+  name: MomentumSGD
+  args:
+    lr: 0.001
+    momentum: 0.9
+  hook:
+    WeightDecay: 0.0005
+    GradientClipping: 5.0
+
+extension:
+  #Evaluator:
+  #  module: chainercv.extensions
+  #  name: DetectionVOCEvaluator
+  #  trigger: [25, 'epoch']
+  #  args:
+  #    use_07_metric: True
+  #    label_names: voc
+  snapshot_object:
+      trigger: [25, "epoch"]
+      args:
+        method: best
+        name: validation/main/map
+  LogReport:
+    trigger: [100, "iteration"]
+  PrintReport:
+    name:
+      epoch
+      iteration
+      main/total_loss
+      main/xy_loss
+      main/wh_loss
+      main/conf_loss
+      main/prob_loss
+      validation/main/map
+      lr
+    trigger: [100, "iteration"]
+  ProgressBar:
+      update_interval: 10
+  # ExponentialShift:
+  #   trigger: [1, 'iteration']
+  #   attr: 'lr'
+  #   rate: 0.1
+  #   name: 'iteration'
+  #   numbers: [40000, 60000]
+  DarknetLRScheduler:
+    args:
+      attr: 'lr'
+      rate: 0.1
+      step_trigger: [40000, 60000]
+      power: 4
+      burn_in: 1000 # 1000 iteration * 64, x / batch
+  observe_lr:
+    trigger: [1, "epoch"]
