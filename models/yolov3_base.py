@@ -647,7 +647,7 @@ class YOLOv3_base(chainer.Chain):
         input_imgs = self.xp.array(input_imgs, dtype='f')
         return input_imgs, orig_sizes, delta_sizes
 
-    def predict(self, imgs):
+    def predict_concat(self, imgs):
         """Inference.
 
         Args:
@@ -709,7 +709,7 @@ class YOLOv3_base(chainer.Chain):
                 scores.append(prob)
             return bboxes, labels, scores
 
-    def inference(self, imgs, img_shape):
+    def inference_concat(self, imgs, img_shape):
         """Inference.
 
         Args:
@@ -739,7 +739,7 @@ class YOLOv3_base(chainer.Chain):
                 n_device = chainer.cuda.get_device_from_array(xy)
                 if n_device.id != -1:
                     self.anchors = chainer.cuda.to_gpu(self.anchors, device=n_device)
-
+                self.anchors = self.xp.reshape(self.anchors, (3, 1, 3, 2, 1))
                 self.bbox_pred_orig = self.xp.empty((N, sum_wh, self.n_boxes, 4), dtype='f')
                 self.re_scale_xy = self.xp.empty((N, sum_wh, self.n_boxes, 2), dtype='f')
                 pre_i = 0
@@ -750,11 +750,11 @@ class YOLOv3_base(chainer.Chain):
                     y_shift = self.xp.broadcast_to(self.xp.arange(out_h, dtype='f').reshape(1, out_h, 1, 1), shape)
                     x_shift = self.xp.reshape(x_shift, (N, out_h*out_w, self.n_boxes))
                     y_shift = self.xp.reshape(y_shift, (N, out_h*out_w, self.n_boxes))
-                    anchors = self.anchors[i, :, :, :]
+                    anchors = self.anchors[i, :, :, :, :]
                     self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 0] = x_shift
                     self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 1] = y_shift
-                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 2] = anchors[:, :, 0][:]
-                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 3] = anchors[:, :, 1][:]
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 2] = anchors[:, :, 0, 0] #[:]
+                    self.bbox_pred_orig[:, pre_i:pre_i+out_h*out_w, :, 3] = anchors[:, :, 1, 0] #[:]
                     self.re_scale_xy[:, pre_i:pre_i+out_h*out_w, :, 0] = img_shape[1] / out_w
                     self.re_scale_xy[:, pre_i:pre_i+out_h*out_w, :, 1] = img_shape[0] / out_h
                     pre_i += out_h*out_w
@@ -768,7 +768,7 @@ class YOLOv3_base(chainer.Chain):
             self.prev_sum_wh = sum_wh
             return bbox_pred, conf, prob
 
-    def inference2(self, imgs, img_shape):
+    def inference(self, imgs, img_shape):
         """Inference using For loop.
 
         Args:
@@ -815,7 +815,7 @@ class YOLOv3_base(chainer.Chain):
             prob_list = self.xp.concatenate(prob_list, axis=1)
             return bbox_list, conf_list, prob_list
 
-    def predict2(self, imgs):
+    def predict(self, imgs):
         """Inference.
 
         Args:

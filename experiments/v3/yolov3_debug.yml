@@ -1,6 +1,6 @@
 end_trigger: [160800, "iteration"]
 results: results/debug
-gpus: [1]
+gpus: [0]
 mode: Train
 seed: 1
 version: 3
@@ -54,23 +54,23 @@ dataset:
   #    use_difficult: False
   #    return_difficult: False
 
-  #valid:
-  #  module: chainercv.datasets
-  #  name: VOCBboxDataset
-  #  args:
-  #    data_dir: /home/user/.chainer/dataset/pfnet/chainer/voc/VOCdevkit/VOC2007
-  #    year: '2007'
-  #    split: test
-  #    use_difficult: True
-  #    return_difficult: True
+  valid:
+    module: chainercv.datasets
+    name: VOCBboxDataset
+    args:
+      data_dir: /home/enshu3/dataset/voc/VOC_test/VOC2007_test/
+      year: '2007'
+      split: test
+      use_difficult: True
+      return_difficult: True
 
 updater:
   name: MultiprocessParallelUpdater # ParallelUpdater # StandardUpdater
 
 iterator:
   name: MultithreadIterator #MultiprocessIterator #SerialIterator
-  train_batchsize: 8
-  test_batchsize: 8
+  train_batchsize: 4
+  test_batchsize: 4
   args:
    n_threads: 8
    # n_processes: 4
@@ -90,7 +90,7 @@ extension:
   Evaluator:
     module: chainercv.extensions
     name: DetectionVOCEvaluator
-    trigger: [25, 'epoch']
+    trigger: [10, 'iteration']
     args:
       use_07_metric: True
       label_names: voc
