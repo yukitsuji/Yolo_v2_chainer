@@ -458,19 +458,6 @@ class YOLOv3_base(chainer.Chain):
         gt_boxes = gt_boxes[batch_index, target_index]
         gt_boxes_w = gt_boxes[:, 3] - gt_boxes[:, 1]
         gt_boxes_h = gt_boxes[:, 2] - gt_boxes[:, 0]
-        #bp_x = bbox_pred_x[batch_index, bbox_index, y_index, x_index]
-        #bp_y = bbox_pred_y[batch_index, bbox_index, y_index, x_index]
-        #bp_w = bbox_pred_w[batch_index, bbox_index, y_index, x_index]
-        #bp_h = bbox_pred_h[batch_index, bbox_index, y_index, x_index]
-
-        #left_x = self.xp.maximum(bp_x - bp_w / 2., gt_boxes[:, 1])
-        #right_x = self.xp.minimum(bp_x + bp_w / 2., gt_boxes[:, 3])
-        #top_y = self.xp.maximum(bp_y - bp_h / 2., gt_boxes[:, 0])
-        #bottom_y = self.xp.minimum(bp_y + bp_h / 2., gt_boxes[:, 2])
-
-        #intersect = self.xp.maximum(0, right_x - left_x) * self.xp.maximum(0, bottom_y - top_y)
-        #union = bp_w * bp_h + gt_boxes_w * gt_boxes_h
-        #iou = intersect / (union - intersect + 1e-3)
 
         tx[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 1] + gt_boxes_w / 2.) * out_w - x_shift[batch_index, bbox_index, y_index, x_index]
         ty[batch_index, bbox_index, y_index, x_index] = (gt_boxes[:, 0] + gt_boxes_h / 2.) * out_h - y_shift[batch_index, bbox_index, y_index, x_index]
@@ -598,26 +585,26 @@ class YOLOv3_base(chainer.Chain):
                 conf_loss += F.sum(((tconf - pred_conf) ** 2) * conf_scale_array)/ 2
                 prob_loss += F.sum(((tprob - pred_prob) ** 2) * self.class_scale)/ 2
                 sum_positive += num_positive
-            total_loss = x_loss + y_loss + w_loss + h_loss + \
-                             conf_loss + prob_loss
-            sum_positive = max(1, sum_positive)
-            total_loss /= sum_positive
+        total_loss = x_loss + y_loss + w_loss + h_loss + \
+                         conf_loss + prob_loss
+        sum_positive = max(1, sum_positive)
+        total_loss /= sum_positive
 
-            # gamma_loss = 0
-            # if self.regularize_bn: # new feature
-            #     for layer in self.layer_bn_list:
-            #         layer = getattr(self, layer)
-            #         gamma = layer.gamma
-            #         gamma_loss += F.sum(F.absolute(gamma))
-            #     gamma_loss *= self.regularize_bn
-            # if not isinstance(gamma_loss, int):
-            #     total_loss += gamma_loss
-            #     chainer.report({'gamma': gamma}, self)
-            chainer.report({'total_loss': total_loss}, self)
-            chainer.report({'xy_loss': x_loss + y_loss}, self)
-            chainer.report({'wh_loss': w_loss + h_loss}, self)
-            chainer.report({'conf_loss': conf_loss}, self)
-            chainer.report({'prob_loss': prob_loss}, self)
+        # gamma_loss = 0
+        # if self.regularize_bn: # new feature
+        #     for layer in self.layer_bn_list:
+        #         layer = getattr(self, layer)
+        #         gamma = layer.gamma
+        #         gamma_loss += F.sum(F.absolute(gamma))
+        #     gamma_loss *= self.regularize_bn
+        # if not isinstance(gamma_loss, int):
+        #     total_loss += gamma_loss
+        #     chainer.report({'gamma': gamma}, self)
+        chainer.report({'total_loss': total_loss}, self)
+        chainer.report({'xy_loss': x_loss + y_loss}, self)
+        chainer.report({'wh_loss': w_loss + h_loss}, self)
+        chainer.report({'conf_loss': conf_loss}, self)
+        chainer.report({'prob_loss': prob_loss}, self)
         return total_loss
 
     def prepare(self, imgs):
