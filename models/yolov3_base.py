@@ -323,6 +323,7 @@ class YOLOv3_base(chainer.Chain):
                 subprocess.call(['wget', pretrained_model['download']])
 
         if parse_dict(pretrained_model, 'path'):
+            print("Load pretrained model: ", pretrained_model)
             chainer.serializers.load_npz(pretrained_model['path'], self)
 
         if self.regularize_bn:

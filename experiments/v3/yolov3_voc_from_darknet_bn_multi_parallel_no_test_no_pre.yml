@@ -9,7 +9,7 @@ model:
   module: models.yolov3_base
   name: YOLOv3_base
   pretrained_model:
-    path: /home/user/darknet_53/darknet_53.npz
+    path: #darknet_53.npz
     download: #https://www.dropbox.com/s/zkq40xp7mo80z0e/darknet19_448.npz
   architecture:
     n_classes: 20
