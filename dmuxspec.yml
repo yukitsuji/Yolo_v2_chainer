@@ -22,3 +22,4 @@ hardware:
 - gpu==8
 datasets:
 - yukitsuji_voc==1 @ /home/user/.chainer/dataset/pfnet/chainer/voc
+- darknet_53==1 @ /home/user/darknet_53
